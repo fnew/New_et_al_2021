@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N scca
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca.out
+#$ -wd /workdir/users/fnn3/twins_uk/scca
+#$ -q long.q@cbsubrito2
+#$ -l h_vmem=50G
+#$ -pe parenv 1
+
+
+##This script runs the SCCA code given the SNP and gene abundace tables
+
+#Set directries
+WRK=/workdir/users/fnn3
+
+#SNP and gene abun tables
+SNP=$WRK/twins_uk/scca/twins240_noissHweLD_SNPresiduals.csv
+GENE=$WRK/twins_uk/scca/twins240_noissHweLD_GENEresiduals.csv
+
+#Output
+ALPHA=$WRK/twins_uk/scca/twinsUK_alpha_results.csv
+BETA=$WRK/twins_uk/scca/twinsUK_beta_results.csv
+CV=$WRK/twins_uk/scca/twinsUK_cv_results.csv
+
+SCRIPT=$WRK/scripts/twins_uk/scca/SCCA.R
+
+Rscript $SCRIPT -s $SNP -g $GENE -a $ALPHA -b $BETA -c $CV 
+

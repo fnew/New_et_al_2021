@@ -1,0 +1,30 @@
+#$ -S /bin/bash
+#$ -N getResiduals
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/resids.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/resids.out
+#$ -wd /workdir/users/fnn3/twins_uk/scca
+#$ -q long.q@cbsubrito2
+#$ -l h_vmem=50G
+#$ -pe parenv 1
+
+
+##This script runs functions to extract the residuals from the SNP and abundance tables 
+
+#Set directries
+WRK=/workdir/users/fnn3
+
+#SNP and gene abun tables
+SNP=$WRK/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv
+GENE=$WRK/twins_uk/gene_abundance/twins240_function_abundance_filt25.csv
+
+#Metadata table
+META=$WRK/twins_uk/metadata/twinsUK240_zyg_age_ship_bmi_family.csv
+
+#Output
+SNP_RESID=$WRK/twins_uk/scca/snp_residuals_reducedSet.csv
+AB_RESID=$WRK/twins_uk/scca/abundance_residuals_reducedSet.csv
+
+SCRIPT=$WRK/scripts/twins_uk/scca/getResiduals.R
+
+Rscript $SCRIPT -s $SNP -g $GENE -m $META -r $SNP_RESID -e $AB_RESID

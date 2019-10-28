@@ -1,0 +1,52 @@
+#$ -S /bin/bash
+#$ -N sam2bam
+#$ -V
+#$ -t 1-32
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/sam2bam.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=15G
+#$ -q short.q@cbsubrito2
+
+#This script will convert sam to bam
+
+#Set directories
+WRK=/workdir/users/fnn3
+
+#Define design file
+DESIGN_FILE=$WRK/design_files/trunc_twins.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	SAMPLE=${ARRAY[0]}
+	NAME=${ARRAY[1]}
+	
+	NAME=${SAMPLE}
+
+#SAM=$WRK/twins_uk/bam/filtered_sam/${NAME}_filter.sam
+BAMOUT=$WRK/twins_uk/bam/filtered_bam
+  if [ ! -d $BAMOUT ]; then mkdir -p $BAMOUT; fi
+#BAM=/home/britolab/fnn3/twins_uk/filtered_bam/${NAME}_filtered
+SAM=$WRK/twins_uk/alignments/filtered_sam/${NAME}_filtered.sam
+REF=/workdir/refdbs/IGC/IGC.fa
+
+#Create LOGS
+LOGS=$BAMOUT/logs
+	if [ ! -e $LOGS ]; then mkdir -p $LOGS; fi
+MYLOG=$LOGS/${NAME}.log
+printf "`date` $NAME TASK_ID:$SGE_TASK_ID HOSTNAME:$HOSTNAME \n\n" > "${MYLOG}"
+
+
+#Path to samtools
+export PATH=/programs/samtools-0.1.19:$PATH
+
+
+#Call SAMtools
+printf "<------------- Convert SAM to BAM ---------------->" >> "${MYLOG}"
+echo `date`": Starting SAM to BAM conversion" >> "${MYLOG}"
+samtools view -ubh -F 0x900  -o $BAMOUT/${NAME}_filtered90_primary.bam $SAM 2>> "${MYLOG}"
+samtools sort -m 1000000000 $BAMOUT/${NAME}_filtered90_primary.bam $BAMOUT/${NAME}_filtered90_primary.sorted 2>> "${MYLOG}"
+samtools index $BAMOUT/${NAME}_filtered90_primary.sorted.bam >> "${MYLOG}"
+echo `date`": Finished SAM to BAM conversion" >> "${MYLOG}"
+
+#Finish the log
+echo `date`": Finished script complete" >> "${MYLOG}"

@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N filter_RPKM
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/filter_rpkm.err
+#$ -wd /workdir/users/fnn3/twins_uk/gene_abundance/unfiltered
+#$ -l h_vmem=5G
+#$ -q short.q@cbsubrito2
+#$ -t 1-250
+
+#This script will filter the gene abundance results by the coverage
+
+WRK=/workdir/users/fnn3
+
+
+DESIGN_FILE=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+NAME=`basename "${DESIGN}"`
+
+
+IN=$WRK/twins_uk/gene_abundance/unfiltered/${NAME}_abundance.txt
+OUT=$WRK/twins_uk/gene_abundance/filtered
+	if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+PROG=$WRK/scripts/twins_uk/filterCountsFiles.py
+
+python $PROG -i $IN -o $OUT/${NAME}_filt90_primary_cov80_abundance.csv -t 80
+
+cd $OUT
+sed -i -e 's/_filtered90_primary.sorted.bam//g'  ${NAME}_filt90_primary_cov80_abundance.csv 

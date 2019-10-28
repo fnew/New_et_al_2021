@@ -1,0 +1,242 @@
+##-----------------------------------------------------------------------------------##
+## The list of samples to be processed
+##-----------------------------------------------------------------------------------##
+BASE0="/workdir/data/twins/newData/fastq"
+BASE="/workdir/data/twins/newData/qc"
+SAMPLES, = glob_wildcards(BASE0 + "/{NAME}_1.fastq.gz")
+NB_SAMPLES = len(SAMPLES)
+
+rule final:
+	input:
+		#expand(BASE+"/0-unzipped/{NAME}_1.fastq",NAME=SAMPLES),
+		#expand(BASE+"/0-unzipped/{NAME}_2.fastq",NAME=SAMPLES),
+		expand(BASE+"/0-unzipped/{NAME}_unzip_done",NAME=SAMPLES),
+		expand(BASE + "/1-bmtagger/{NAME}.nohuman_1.fastq", NAME=SAMPLES),
+		expand(BASE + "/1-bmtagger/{NAME}.nohuman_2.fastq", NAME=SAMPLES),
+		expand(BASE + "/1b-humanreads/{NAME}.human", NAME=SAMPLES),
+		#expand(BASE + "/1b-humanreads/{NAME}.human_1.fastq", NAME=SAMPLES),
+		#expand(BASE + "/1b-humanreads/{NAME}.human_2.fastq", NAME=SAMPLES),
+		expand(BASE + "/2-trimmo/{NAME}.1.fastq", NAME=SAMPLES),
+		expand(BASE + "/2-trimmo/{NAME}.2.fastq", NAME=SAMPLES),
+		expand(BASE + "/2-trimmo/{NAME}.1.solo.fastq", NAME=SAMPLES),
+		expand(BASE + "/2-trimmo/{NAME}.2.solo.fastq", NAME=SAMPLES),
+		expand(BASE+"/3-derep/{NAME}.1.fastq",NAME=SAMPLES),
+		expand(BASE+"/3-derep/{NAME}.2.fastq",NAME=SAMPLES),
+		expand(BASE+"/3-derep/{NAME}.1.solo.fastq",NAME=SAMPLES),
+		expand(BASE+"/3-derep/{NAME}.2.solo.fastq",NAME=SAMPLES),
+		expand(BASE+"/5-readcounts/Readcounts_{NAME}.txt",NAME=SAMPLES),
+		#BASE + '/ReadCounts.txt',
+		BASE + '/ReadCounts2.txt',
+
+## Unzip the reads
+rule gunzip:
+	input:
+		gzip1 = BASE0+"/{NAME}_1.fastq.gz",
+		gzip2 = BASE0+"/{NAME}_2.fastq.gz"
+	params:
+		out=BASE+"/0-unzipped",
+		n="unzip_{NAME}"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 5
+	output:
+		unzip1=BASE + "/0-unzipped/{NAME}_1.fastq",
+		unzip2=BASE + "/0-unzipped/{NAME}_2.fastq",
+		tfile=BASE+"/0-unzipped/{NAME}_unzip_done"
+	shell: """
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi	
+		gunzip -c {input.gzip1} > {output.unzip1}
+		gunzip -c {input.gzip2} > {output.unzip2}
+		touch {output.tfile}
+		"""
+
+## Remove human reads
+rule bmtagger:
+	input: 
+		R1=BASE + "/0-unzipped/{NAME}_1.fastq",
+		R2=BASE + "/0-unzipped/{NAME}_2.fastq"
+	params: 
+		n="bmt_{NAME}",
+		out=BASE + "/1-bmtagger",
+		config="/workdir/refdbs2/QC/bmtagger.conf",
+		name="{NAME}",
+		base=BASE,
+		REFGENOME="/workdir/refdbs2/QC/Homo_sapiens_assembly19.fasta"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 20
+	output:
+		out_R1=BASE + "/1-bmtagger/{NAME}.nohuman_1.fastq",
+		out_R2=BASE + "/1-bmtagger/{NAME}.nohuman_2.fastq"
+	message:  """--- BMTagger"""
+	shell: """ 
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi
+		export PATH=/programs/ncbi-blast-2.3.0+/bin:$PATH
+		bash /programs/bmtools/bmtagger/bmtagger.sh -C {params.config} -b {params.REFGENOME}.bitmask -x {params.REFGENOME}.srprism -T {params.base}/1-bmtagger -q1 -1 {input.R1} -2 {input.R2} -o {params.base}/1-bmtagger/{params.name}.nohuman -X """
+
+
+## Rule to save the human reads
+rule blacklist: 
+	input: 
+		R1=BASE + "/0-unzipped/{NAME}_1.fastq",
+		R2=BASE + "/0-unzipped/{NAME}_2.fastq"
+	params: 
+		n="bmt_{NAME}",
+		out=BASE + "/1b-humanreads",
+		config="/workdir/refdbs2/QC/bmtagger.conf",
+		name="{NAME}",
+		base=BASE,
+		REFGENOME="/workdir/refdbs2/QC/Homo_sapiens_assembly19.fasta"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 20
+	output:
+		out=BASE + "/1b-humanreads/{NAME}.human"
+		#out_R2=BASE + "/1b-humanreads/{NAME}.human_2.fastq"
+	message:  """--- BMTagger"""
+	shell: """ 
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi
+		export PATH=/programs/ncbi-blast-2.3.0+/bin:$PATH
+		bash /programs/bmtools/bmtagger/bmtagger.sh -C {params.config} -b {params.REFGENOME}.bitmask -x {params.REFGENOME}.srprism -T {params.base}/1b-humanreads -q1 -1 {input.R1} -2 {input.R2} -o {params.base}/1b-humanreads/{params.name}.human  """
+
+
+
+## Trimming
+rule trimmo:
+	input: 
+		R1=BASE + "/1-bmtagger/{NAME}.nohuman_1.fastq",
+		R2=BASE + "/1-bmtagger/{NAME}.nohuman_2.fastq"
+	params:
+		n="trim_{NAME}",
+		out=BASE + "/2-trimmo",
+			ADAPTER="/workdir/refdbs2/QC/nextera_truseq_nebI+II+III_adapters.fasta"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 20
+	output:
+		out_R1=BASE + "/2-trimmo/{NAME}.1.fastq",
+		out_R2=BASE + "/2-trimmo/{NAME}.2.fastq",
+		out_R1_solo=BASE +"/2-trimmo/{NAME}.1.solo.fastq",
+		out_R2_solo=BASE +"/2-trimmo/{NAME}.2.solo.fastq"
+	message:  """--- Trimmomatic"""
+	shell: """
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi
+		java -Xmx8g -jar /programs/trimmomatic/trimmomatic-0.39.jar \
+		PE {input.R1} {input.R2} {output.out_R1} {output.out_R1_solo} \
+		{output.out_R2} {output.out_R2_solo} \
+		ILLUMINACLIP:{params.ADAPTER}:2:30:10:8:true \
+		SLIDINGWINDOW:4:15 LEADING:3 TRAILING:3 MINLEN:50
+		"""
+
+## Paired dereplication					
+rule derep:
+	input:
+		R1=BASE + "/2-trimmo/{NAME}.1.fastq",
+		R2=BASE + "/2-trimmo/{NAME}.2.fastq",
+	params:
+		n="derep2_{NAME}",
+		name="{NAME}",
+		out=BASE + "/3-derep/out_bad",	
+		outgood=BASE+ "/3-derep/{NAME}.derep2",
+		outbad=BASE + "/3-derep/out_bad/{NAME}",
+		good_R1=BASE+"/3-derep/{NAME}.derep2_1.fastq",
+		good_R2=BASE+"/3-derep/{NAME}.derep2_2.fastq",
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 20
+	output:
+		bad_R1=BASE+"/3-derep/out_bad/{NAME}_1.fastq",
+		bad_R2=BASE+"/3-derep/out_bad/{NAME}_2.fastq",
+		moved_R1=BASE+"/3-derep/{NAME}.1.fastq",
+		moved_R2=BASE+"/3-derep/{NAME}.2.fastq",
+	message:  """--- Dereplication2"""
+	shell: """
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi 
+		perl /programs/prinseq-lite-0.20.2/prinseq-lite.pl -fastq {input.R1} \
+		-fastq2 {input.R2} -derep 12345 -out_format 3 -no_qual_header -out_good \
+		{params.outgood} -out_bad {params.outbad}
+		mv {params.good_R1} {output.moved_R1}
+		mv {params.good_R2} {output.moved_R2}
+		"""
+
+## Solo dereplication
+rule derep_solo:
+	input:
+		R1=BASE + "/2-trimmo/{NAME}.1.solo.fastq",
+		R2=BASE + "/2-trimmo/{NAME}.2.solo.fastq",
+	params:
+		n="derep2_{NAME}",
+		name="{NAME}",
+		out=BASE + "/3-derep/out_bad",	
+		outgood=BASE+ "/3-derep/{NAME}.solo.derep2",
+		outbad=BASE + "/3-derep/out_bad/{NAME}",
+		good_R1=BASE+"/3-derep/{NAME}.1.solo",
+		good_R2=BASE+"/3-derep/{NAME}.2.solo",
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 20
+	output:
+		bad_R1=BASE+"/3-derep/out_bad/{NAME}.1.solo.fastq",
+		bad_R2=BASE+"/3-derep/out_bad/{NAME}.2.solo.fastq",
+		moved_R1=BASE+"/3-derep/{NAME}.1.solo.fastq",
+		moved_R2=BASE+"/3-derep/{NAME}.2.solo.fastq",
+	message:  """--- Dereplication2"""
+	shell: """
+		if [ ! -d {params.out} ]; then mkdir -p {params.out}; fi 
+		perl /programs/prinseq-lite-0.20.2/prinseq-lite.pl -fastq {input.R1} \
+		 -derep 12345 -out_format 3 -no_qual_header -out_good \
+		{params.good_R1} -out_bad null
+		
+		perl /programs/prinseq-lite-0.20.2/prinseq-lite.pl -fastq {input.R2} \
+		-derep 12345 -out_format 3 -no_qual_header -out_good \
+		{params.good_R2} -out_bad null
+		
+		mv {params.good_R1} {output.moved_R1}
+		mv {params.good_R2} {output.moved_R2}
+		"""
+
+
+
+rule readCount2:
+	input:
+		#BASE + "/0-unzipped/{NAME}_1.fastq",
+		#BASE + "/0-unzipped/{NAME}_2.fastq",
+		#BASE + "/1-bmtagger/{NAME}.human_1.fastq",
+		#BASE + "/1-bmtagger/{NAME}.human_2.fastq",
+		#BASE + "/2-trimmo/{NAME}.1.fastq",
+		#BASE + "/2-trimmo/{NAME}.2.fastq",
+		#BASE +"/2-trimmo/{NAME}.1.solo.fastq",
+		#BASE +"/2-trimmo/{NAME}.2.solo.fastq",
+		BASE + "/3-derep/{NAME}.1.fastq",
+		BASE + "/3-derep/{NAME}.2.fastq",
+		BASE + "/3-derep/{NAME}.1.solo.fastq",
+		BASE + "/3-derep/{NAME}.2.solo.fastq"
+	params:
+		"{NAME}",
+		n="rc2_{NAME}"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 10
+	output:
+		BASE+ "/5-readcounts/Readcounts_{NAME}.txt"
+	message: """--- ReadCounts"""
+	run:
+		with open(output[0],'w') as outfile:
+			outfile.write(params[0])
+			for i in input:
+				with open(i) as infile:
+					count = 0
+					for line in infile:
+						count = count + 1
+				outfile.write('\t' + str(count/4.0))
+			outfile.write('\n')
+
+rule Combine_readcounts2:
+	input:
+		expand(BASE+'/5-readcounts/Readcounts_{NAME}.txt', NAME=SAMPLES)
+	params:
+		n="rc2_combine"
+	resources:
+		mem_mb=lambda wildcards, attempt: attempt * 10
+	output:
+		BASE + '/ReadCounts2.txt'
+	run:
+		with open(output[0], 'w') as out:
+		#	out.write('Sample\tRaw_R1\tRaw_R2\tBmtagger_R1\tBmtagger_R2\tTrimmo_R1\tTrimmo_R2\tTrimmo_solo_R1\tTrimmo_solo_R2\tDerep_R1\tDerep_R2\tDerep_solo_R1\tDerep_solo_R2\n')
+		    out.write('Sample\tDerep_R1\tDerep_R2\tDerep_solo_R1\tDerep_solo_R2\n')
+		    for i in input:
+			    for line in open(i):
+				    out.write(line)

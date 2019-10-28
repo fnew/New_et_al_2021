@@ -1,0 +1,155 @@
+---
+title: "Recoding SNPs"
+author: "Felicia New"
+date: "4/17/2019"
+output: pdf_document
+---
+
+
+```{r, echo=F}
+library(data.table)
+
+snp <- as.data.frame(fread("~/Docs/brito_lab/twins_analysis/snp/BGI_twins_maf10_nomissing_formatAnalysis.csv", header=T, sep=','))
+  rownames(snp) <- snp[,1]
+  snp[,1] <- NULL
+ 
+recode <- function(c) {
+  d <- matrix(nrow = length(c), ncol = 2)
+  rownames(d) <- rownames(snp)
+  for (i in 1:length(c)) {
+    if (c[i] == 0) {
+      d[i,] <- c(0,0)
+    } else if (c[i] == 1) {
+      d[i,] <- c(1,0)
+    } else {
+      d[i,] <- c(0,1)
+    }
+  }
+  return(d)
+}
+
+mats <- lapply(snp, recode)
+
+mat2 <- matrix(nrow = nrow(snp), ncol = 2*ncol(snp))
+rownames(mat2) <- rownames(snp)
+for (j in 1:(ncol(snp))) {
+  mat2[,(2*j-1):(2*j)] <- mats[[j]]
+}
+
+#I need to modify this table....I need column and row names
+write.table(mat2, "~/Docs/brito_lab/twins_analysis/snp/BGI_twins_maf10_nomissing_dummy.csv", sep=",", row.names = T, quote=F, col.names = F)
+```
+
+##Remove the ten people without SNPs from the gene abundance file.
+```{r, echo=F}
+gene <- as.data.frame(fread("~/Docs/brito_lab/twins_analysis/twins_function_abundance_filt25.csv", header=T, sep=',')) 
+
+gene[is.na(gene)] <- 0 #Set NAs to 0.
+rownames(gene) <- gene[,1]
+gene[,1] <- NULL
+
+names <- rownames(snp)
+gene.sub <- subset(gene, rownames(gene) %in% names)
+
+#Save this file.
+write.csv(gene.sub,"~/Docs/brito_lab/twins_analysis/twins240_function_abundance_filt25.csv", quote=F,row.names=T)
+```
+
+
+```{r,echo=F}
+#Plotting the parallel results
+cores <- c(2,4,6,8,10,12,14,16)
+seconds <- c(350.456,237.554,153.379,159.254,112.541,110.727,121.025,74.666)
+pdf("~/Docs/brito_lab/twins_analysis/scca/parallel_computing_time.pdf")
+plot(cores, seconds, pch=20)
+dev.off()
+```
+
+
+```{r}
+meta <- read.csv("~/Docs/brito_lab/twins_analysis/twinsUK_zyg_age_ship_family.csv", header=T, row.names=1)
+meta1 <- meta[,c(-5)]
+meta240 <- subset(meta, rownames(meta) %in% names)
+
+meta.names <- rownames(meta1)
+meta240 <- subset(meta1, rownames(meta1) %in% bgi)
+'%ni%' <- Negate('%in%')
+lost<-subset(meta1, meta.names %ni% names)
+
+#This metadata is missing 4 individuals. I don't know when it lost them, so I need to remake this file.
+meta <- read.csv("~/Docs/brito_lab/twins_metadata/Brito_BGI_twins_metadata.csv")
+  meta$BGI_ID <- sub("^", "BGI", meta$BGI_ID)
+  meta.short <- meta[,c(1,5,12,13,27,17)]
+meta.short$MZTwin <- 0
+meta.short$MZTwin[meta.short$IndividualZygosity=='MZ'] <-1
+
+meta.short2 <- meta.short[,c(-3)]
+rownames(meta.short2) <- meta.short2[,1]
+meta.short2[,1] <- NULL
+meta.final <- meta.short2
+
+#SAve this file. 
+write.csv(meta.final, "~/Docs/brito_lab/twins_analysis/twinsUK_zyg_age_ship_bmi_family.csv", quote=F)
+
+
+meta.240 <- subset(meta.final, rownames(meta.final) %in% names)
+write.csv(meta.240, "~/Docs/brito_lab/twins_analysis/twinsUK240_zyg_age_ship_bmi_family.csv", quote=F)
+
+```
+
+
+```{r}
+#Check why matrix.model is throwing errors on the server.
+X1.a <- as.data.frame(fread("~/Docs/brito_lab/twins_analysis/snp/BGI_twins_maf10_nomissing_dummy.csv", header=F, sep=','))
+rownames(X1.a) <- X1.a[,1]
+X1.a[,1] <- NULL
+
+X1.as <- as.matrix(X1.a[ order(row.names(X1.a)),])
+
+mod <- svd(X1.as)
+pc <- mod$u[,1] * mod$d[1]
+
+A <- as.matrix(model.matrix(~pc + Age.at.metagenomics.sample + + MZTwin + SampleShipmentNum + IndividualBMI + IndividualFamilyID, data = meta.240))
+A2 <- crossprod(A,A)
+AX1 <- crossprod(A, X1.as)
+a2ax1 <- ginv(A2, AX1)
+X1 <- X1.as - A %*% a2ax1
+X1 <- (X1.as) - A %*% solve(A2, AX1)
+
+#check
+#only A is square, the other two are not.
+is.singular.matrix(X1.as)
+
+write.csv(A, "~/Docs/brito_lab/twins_analysis/metadata_model_matrix_output.csv", quote=F, row.names=F)
+```
+
+
+```{r}
+#Do PCA on the SNP table and look at singular values for Ben
+#Demean the SNPs
+snp.demean <- apply(X1.as, 2, FUN= function(col) col - mean(col))
+mod <- svd(snp.demean)
+
+mod$d
+
+pc <- mod$u[,1] * mod$d[1]
+snp.pca <- prcomp(X1.as)
+```
+
+##New way to code the SNPs
+```{r, echo=F}
+coded <- cbind(snp-1, 1-2*abs(snp-1))
+#The duplicated columns are not next to each other and they are named like rs123 and rs123.1
+#I need to figure out how to fix this.
+fwrite(coded, "~/Docs/brito_lab/twins_analysis/snp/BGI_twins_maf10_nomissing_dummy_update.csv", sep=',', quote=F, row.names = T, col.names=T, showProgress = T)
+```
+```{r}
+#Testing bigcor with the snp table
+Y <- as.matrix(X1.as)
+Yc <- Y[,!colSums(!is.finite(Y))]
+
+library(propagate)
+
+sigmaY <- bigcor(Yc, fun="cov")
+```
+

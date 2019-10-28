@@ -1,0 +1,25 @@
+Step 1: /programs/plink-1.9-x86_64-beta5/plink --file hapmap_imputed_through_batch3_cornell_map_ids_fix_michelle_mistakes_dup_MZ_BGI_recode  --indep-pairwise 50 10 0.8 --out BGI_twins_ld80
+
+This creates: BGI_twins_ld80.prune.out and BGI_twins_ld80.prune.in
+ 360417 BGI_twins_ld80.prune.in
+ 1347524 BGI_twins_ld80.prune.out
+ 1707941 total
+
+Step 2: /programs/plink-1.9-x86_64-beta5/plink --file BGI_twins_maf10_nomissing_hwe001 --exclude BGI_twins_ld80.prune.out --make-bed  --out BGI_twins_maf10_nomissing_hwe001_ld80
+Options in effect:
+ --exclude BGI_twins_ld80.prune.out
+ --file BGI_twins_maf10_nomissing_hwe001
+ --make-bed
+ --out BGI_twins_maf10_nomissing_hwe001_ld80
+129987 variants and 240 people pass filters and QC.
+
+Now I have bed, fam, and bim files. I need to go through all the steps to get the AD coded table. Refer to /Twins \Data/ to see these steps. Don't forget to delete the VCF header lines before starting. 
+	Input: BGI_twins_maf10_nomissing_hwe001_ld80_recode.vcf
+	Output: /workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld.csv
+			
+Now, need to code this table in R. 
+	coded <- cbind(snp-1, 1-2*abs(snp-1))
+	Dim(snp)
+		240	259974
+	OUT: BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv
+

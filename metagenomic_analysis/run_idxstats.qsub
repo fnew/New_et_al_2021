@@ -1,0 +1,33 @@
+#$ -S /bin/bash
+#$ -N idxstats
+#$ -V
+#$ -t 1-32
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/idxstats.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=5G
+#$ -q short.q@cbsubrito2
+
+#This script will run samtools idxstats to get alignment stats from indexed bam files. These counts will be used to calculate RPKM
+
+#Set directories
+WRK=/workdir/users/fnn3
+BAMOUT=$WRK/twins_uk/bam/filtered_bam
+OUT=$BAMOUT/idxstats
+	if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+
+#Define design file
+DESIGN_FILE=$WRK/design_files/trunc_twins.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	NAME=${ARRAY[0]}
+	BATCH=${ARRAY[1]}
+	
+
+BAM=$BAMOUT/${NAME}_filtered90_primary
+
+#Path to SAMtools
+export PATH=/programs/samtools-0.1.19
+
+samtools idxstats ${BAM}.sorted.bam > $OUT/${NAME}_filtered90_primary.idxstats.txt

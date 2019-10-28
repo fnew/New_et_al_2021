@@ -1,0 +1,38 @@
+#$ -S /bin/bash
+#$ -N RPKM
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/twins_rpkm.err
+#$ -wd /workdir/users/fnn3/twins_uk/gene_abundance
+#$ -l h_vmem=90G
+#$ -q long.q@cbsubrito2
+#$ -t 1-13
+
+
+# Script to calculate RPKM on the twins gene alignments
+
+WRK=/workdir/users/fnn3
+OUTDIR=$WRK/twins_uk/gene_abundance/unfiltered
+LOG=$OUTDIR/logs
+	if [ ! -d $LOG ]; then mkdir -p $LOG; fi
+
+
+DESIGN_FILE=$WRK/design_files/unfinished_twins_rpkm_counts.csv
+   DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+   IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+   NAME=${ARRAY[0]}
+   FQ1=${ARRAY[1]}
+   FQ2=${ARRAY[2]}
+
+
+#List all inputs
+
+STAT=$WRK/twins_uk/bam/filtered_bam/idxstats/${NAME}_filtered90_primary.idxstats.txt
+DEPTH=$WRK/twins_uk/bam/filtered_bam/depth/${NAME}_filtered90_primary.depth.txt
+LOGFILE=$LOG/${NAME}.log
+OUT=$OUTDIR/${NAME}_abundance.txt
+
+#Run the program
+python /workdir/scripts/rpkm_calculate.py -f1 $FQ1 -f2 $FQ2  -s $STAT -d $DEPTH -g ${LOGFILE} -o ${OUT}
+
+

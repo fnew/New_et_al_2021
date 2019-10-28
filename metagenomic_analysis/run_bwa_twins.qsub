@@ -1,0 +1,41 @@
+#$ -S /bin/bash
+#$ -N aln_twin
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/IGC_bwa_aln.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=16G
+#$ -pe parenv 4
+#$ -t 1-32
+#$ -q long.q@cbsubrito2
+
+#This script will align the Twins UK dataset to the IGC
+#500 files
+
+#Set directories
+WRK=/workdir/users/fnn3
+OUT=$WRK/twins_uk/alignments
+	if [! -e $OUT]; then mkdir -p $OUT; fi
+DATA=/workdir/data/twins/trimmomatic
+
+#Create design file of file names
+DESIGN_FILE=$WRK/design_files/trunc_twins.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	SAMPLE=${ARRAY[0]}
+	BATCH=${ARRAY[1]}
+
+
+READ1=$DATA/$SAMPLE/${SAMPLE}.derep.bmt_1.adapter.fastq
+READ2=$DATA/$SAMPLE/${SAMPLE}.derep.bmt_2.adapter.fastq
+
+#BWA mem takes the prefix of the header files
+REF=/workdir/refdbs/IGC/IGC_bwa
+
+#Export the path to bwa
+export PATH=/programs/bwa-0.7.8
+
+# Align
+
+bwa mem -a -t 4  $REF $READ1 $READ2 > $OUT/${SAMPLE}.sam
+

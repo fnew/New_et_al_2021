@@ -1,0 +1,30 @@
+#$ -S /bin/bash
+#$ -N depth
+#$ -V
+#$ -t 1-32
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/depth.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=5G
+#$ -q short.q@cbsubrito2
+
+#This script uses samtools to generate depth files from BAMs (requires sorted and indexed BAMs)
+
+#Set directories
+WRK=/workdir/users/fnn3
+DEPTH=$WRK/twins_uk/bam/filtered_bam/depth
+   if [ ! -d $DEPTH ]; then mkdir -p $DEPTH; fi
+
+#DESIGN_FILE=$WRK/design_files/twins_names.csv
+DESIGN_FILE=$WRK/design_files/trunc_twins.csv
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	NAME=${ARRAY[0]}
+	BATCH=${ARRAY[1]}
+
+BAM=$WRK/twins_uk/bam/filtered_bam/${NAME}_filtered90_primary
+
+#export samtools
+export PATH=/programs/samtools-0.1.19
+
+samtools depth ${BAM}.sorted.bam > $DEPTH/${NAME}_filtered90_primary.depth.txt

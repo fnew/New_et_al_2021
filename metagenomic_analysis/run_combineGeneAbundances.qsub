@@ -1,0 +1,18 @@
+#$ -S /bin/bash
+#$ -N combineRPKM
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/twins_combineRpkm.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -q long.q@cbsubrito2
+#$ -l h_vmem=30G
+
+# Script to combine the counts files into one abundance table with the IGC functional annotations
+
+WRK=/workdir/users/fnn3
+IN=$WRK/twins_uk/gene_abundance/filtered
+OUT=$WRK/twins_uk/gene_abundance/filtered/gene_abundance_table_filt90_primary_cov80.csv
+LOG=$WRK/twins_uk/gene_abundance/combineCounts.log
+
+PROG=$WRK/scripts/combineGeneAbundances.py
+
+python  $PROG -i $IN  -o $OUT -g $LOG

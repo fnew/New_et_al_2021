@@ -17,6 +17,7 @@ option_list=list(
 	make_option(c("-g", "--gene"), action="store", type="character", default=NULL, help="Input the gene abundance residuals", metavar="character"),
 	make_option(c("-a", "--alpha"), action="store", type="character", default=NULL, help="Output ALPHA results from the model", metavar="character"),
 	make_option(c("-b", "--beta"), action="store", type="character", default=NULL, help="Output BETA results from the model", metavar="character"),
+	make_option(c("-m", "--mac"), action="store", type="character", default=NULL, help="Output Mean Abs Corrs results from the model", metavar="character"),
 	make_option(c("-c", "--cv"), action="store", type="character", default=NULL, help="Output CV results from the model", metavar="character"),
 	make_option(c("-t", "--thread"), action="store", type="integer", default=1, help="How many threads to use"));
 opt_parser=OptionParser(option_list=option_list);
@@ -42,16 +43,28 @@ ab.residuals  <- X2.a[ order(row.names(X2.a)), ]
 group <- rep(seq(from = 1, to = ncol(snp.residuals)/2), 2)
 
 
-obj <- runCCA(snp.residuals, ab.residuals, 
-              penalization_x = "glasso", penalization_y = "enet", 
-              group_x = group,
-              parallel_CV = F,
-	      nlambda=10)  
+#obj <- runCCA(snp.residuals, ab.residuals, 
+#              penalization_x = "glasso", penalization_y = "enet", 
+#              group_x = group,
+#              parallel_CV = F,
+#	      nlambda=10)  
               #nr_cores = 16) #Runs fine on one core, not going to use this 
+
+#runCCA is to get the tuning parameters, sCCA takes the tuning parameters that we pick to run
+
+nnx <- c(0.00963166838580798, 0.00577403350158676, 0.0034614421450152, 0.00207508004932683, 0.00124397780772249, 0.000745745103475914)
+nny < c(0.0112327319448012, 0.00673384588896276, 0.00403683455450812, 0.00242001873657089, 0.00145076311805099, 0.00086970964021517, 0.000521377231659547)
+obj <- sCCA(X, Y, 
+            penalization_x = "glasso", penalization_y = "enet",
+            group_x = group,
+            grp_penalty_x = nnx, lasso_penalty_y = nny, 
+            cross_validate=TRUE, parallel_CV = FALSE)
+
 
 #obj <- sCCA(snp.residuals, ab.residuals, lasso_penalty_x = 1/50, lasso_penalty_y = 1/50)
 
 #Output: we want ALPHA, BETA, CV_RESULTS
 fwrite(data.frame(obj$ALPHA), opt$alpha, row.names=T,quote=F)
 fwrite(data.frame(obj$BETA), opt$beta, row.names=T,quote=F)
-fwrite(data.frame(obj$CV_results), opt$cv,row.names=T, quote=F)
+fwrite(data.frame(obj$CV_results$mean_abs_cors), opt$mac, row.names=T, quote=F)
+fwrite(data.frame(obj$CV_results), opt$cv, row.names=T, quote=F)

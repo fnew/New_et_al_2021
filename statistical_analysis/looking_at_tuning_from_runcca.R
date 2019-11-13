@@ -46,3 +46,63 @@ new.pen.x <- c(exp(log(pen.x)[1]+dx*(3:1)), pen.x[1:3]) #3 news ones, 3 old ones
 dy <- log(pen.y[1]) - log(pen.y[2])
 new.pen.y <- c(exp(log(pen.y)[1]+dy*(3:1)), pen.y[1:4]) #3 new ones, 4 old ones
 #c(0.0112327319448012, 0.00673384588896276, 0.00403683455450812, 0.00242001873657089, 0.00145076311805099, 0.00086970964021517, 0.000521377231659547)
+
+
+####################################################################################################################
+### sCCA 2 results
+####################################################################################################################
+
+alpha2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_alpha_results2.csv")
+beta2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_beta_results2.csv")
+mac <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_mean_abs_corrs_results2.csv")
+cv <- as.data.frame(fread("/workdir/users/fnn3/twins_uk/scca/twinsUK_cv_results2.csv", header=T, sep=','), row.names=1)
+
+# make matrix of correlation values for plotting
+ndecs <- 4
+nlambda_y <- 10; nlambda_x <- 9
+m <- matrix(mac[,8], nrow=nlambda_y, byrow=FALSE) #arbitrary test
+rownames(m) <- round(mac[1:nlambda_y,3], ndecs)
+colnames(m) <- round(mac[1+(0:(nlambda_x-1))*nlambda_y, 7], ndecs)
+
+# visualize the values
+gplots::heatmap.2(m, dendrogram='none', Rowv=FALSE, Colv=FALSE,trace='none')
+
+# Min and Max
+mac[c( which.min(mac[,8]), which.max(mac[,8]) ), ]
+
+# the reported max and min
+cv[2,(ncol(cv)-6):ncol(cv)]
+
+############
+#easier visualization for 1 se rule
+OneSEOfMax <- mac[which.max(mac[,8]), 8] - mac[which.max(mac[,8]), 9]
+
+m.thresholded <- m
+m.thresholded[mac$mean.Cor.over.CVs<=OneSEOfMax] <- NA_real_
+
+gplots::heatmap.2(m.thresholded, dendrogram='none', Rowv=FALSE, Colv=FALSE,trace='none')
+
+### looking at this plot, the "top left" point is:
+lambda_y_1se <- rev(sort(unique(mac[,3])))[1] #1 chosen from looking at plot
+#0.01123273
+lambda_x_1se <- rev(sort(unique(mac[,7])))[2] #2 chosen from looking at plot
+#0.007702851
+
+
+#############################################################
+## Third run of SCCA
+#############################################################
+
+alpha3 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_alpha_results3.csv")
+#356
+beta3 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_beta_results3.csv")
+#171
+
+#################################################################
+## Trying a few more lambdas (y_lambdas)
+
+k <- 3 #the number of "new" values
+d <- log(nny)[1] - log(nny)[2]
+nny2 <- c(-(1:k)*(0.5*d)+log(nny)[1], log(nny)[1:(length(nny)-k)])
+nny2 <- exp(nny2)
+

@@ -1,8 +1,8 @@
 #$ -S /bin/bash
 #$ -N scca
 #$ -V
-#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca.err
-#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca.out
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca4.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca4.out
 #$ -wd /workdir/users/fnn3/twins_uk/scca
 #$ -q long.q@cbsubrito2
 #$ -l h_vmem=50G
@@ -19,12 +19,12 @@ SNP=$WRK/twins_uk/scca/twins240_noissHweLD_SNPresiduals.csv
 GENE=$WRK/twins_uk/scca/twins240_noissHweLD_GENEresiduals.csv
 
 #Output
-ALPHA=$WRK/twins_uk/scca/twinsUK_alpha_results.csv
-BETA=$WRK/twins_uk/scca/twinsUK_beta_results.csv
-CV=$WRK/twins_uk/scca/twinsUK_cv_results.csv
-MAC=$WRK/twins_uk/scca/twinsUK_mean_abs_corrs_results.csv
+ALPHA=$WRK/twins_uk/scca/twinsUK_alpha_results4.csv
+BETA=$WRK/twins_uk/scca/twinsUK_beta_results4.csv
+CV=$WRK/twins_uk/scca/twinsUK_cv_results4.csv
+MAC=$WRK/twins_uk/scca/twinsUK_mean_abs_corrs_results4.csv
 
-SCRIPT=$WRK/scripts/twins_uk/scca/SCCA.R
+SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/SCCA.R
 
 Rscript $SCRIPT -s $SNP -g $GENE -a $ALPHA -b $BETA -c $CV -m $MAC 
 

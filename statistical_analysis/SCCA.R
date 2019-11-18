@@ -61,17 +61,20 @@ group <- rep(seq(from = 1, to = ncol(snp.residuals)/2), 2)
 #nny <- 0.01123273
 
 # this is the tuning parameter pairs from the FOURTH run (nny is new, nnx is as from 2nd run)
-nny <- c(0.0100452415261994, 0.008983289, 0.00803360288023392, 0.0112327319448012, 
-  0.008983289, 0.00673384588896276, 0.00538534, 0.00403683455450812, 
-  0.003228427, 0.00242001873657089)
-nnx <- c(0.00963166838580798, 0.007702851, 0.00577403350158676, 0.004617738, 0.0034614421450152, 0.002768261, 0.00207508004932683, 0.00124397780772249, 0.000745745103475914)
+#nny <- c(0.0100452415261994, 0.008983289, 0.00803360288023392, 0.0112327319448012, 
+#  0.008983289, 0.00673384588896276, 0.00538534, 0.00403683455450812, 
+#  0.003228427, 0.00242001873657089)
+#nnx <- c(0.00963166838580798, 0.007702851, 0.00577403350158676, 0.004617738, 0.0034614421450152, 0.002768261, 0.00207508004932683, 0.00124397780772249, 0.000745745103475914)
 
+# this is the tuning param pair used for the 4.5th run (resulting from 1 se rule):
+nny <- 0.008983289 #nny[-2][c(3,1,4,2,5:9)][3]
+nnx <- 0.009631668 #nnx[1]
 
 obj <- sCCA(snp.residuals, ab.residuals, 
             penalization_x = "glasso", penalization_y = "enet",
             group_x = group,
             grp_penalty_x = nnx, lasso_penalty_y = nny, 
-            cross_validate=TRUE)
+            cross_validate=FALSE) #changed to false
 
 #Output: we want ALPHA, BETA, CV_RESULTS
 fwrite(data.frame(obj$ALPHA), opt$alpha, row.names=T,quote=F)

@@ -99,10 +99,46 @@ beta3 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_beta_results3.csv")
 #171
 
 #################################################################
-## Trying a few more lambdas (y_lambdas)
+## Trying a few more lambdas (y_lambdas) for the fourth run
 
 k <- 3 #the number of "new" values
 d <- log(nny)[1] - log(nny)[2]
 nny2 <- c(-(1:k)*(0.5*d)+log(nny)[1], log(nny)[1:(length(nny)-k)])
 nny2 <- exp(nny2)
 
+###################################################################
+## Fourth run of SCCA 
+#####################################################################
+
+alpha4 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_alpha_results4.csv")
+beta4 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_beta_results4.csv")
+mac4 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_mean_abs_corrs_results4.csv")
+#cv4 <- as.data.frame(fread("/workdir/users/fnn3/twins_uk/scca/twinsUK_cv_results4.csv", header=T, sep=','), row.names=1)
+
+# make matrix of correlation values for plotting
+ndecs <- 4
+nlambda_y <- 10; nlambda_x <- 9
+m <- matrix(mac4[,7], nrow=nlambda_y, byrow=FALSE) #arbitrary test
+rownames(m) <- round(mac4[1:nlambda_y,2], ndecs)
+colnames(m) <- round(mac4[1+(0:(nlambda_x-1))*nlambda_y, 6], ndecs)
+
+# visualize the values
+gplots::heatmap.2(m, dendrogram='none', Rowv=FALSE, Colv=FALSE,trace='none')
+# Min and Max
+mac4[c( which.min(mac4[,7]), which.max(mac4[,7]) ), ]
+
+
+#easier visualization for 1 se rule
+OneSEOfMax <- mac4[which.max(mac4[,7]), 7] - mac4[which.max(mac4[,7]), 8]
+
+m.thresholded <- m
+m.thresholded[mac4$mean.Cor.over.CVs<=OneSEOfMax] <- NA_real_
+
+gplots::heatmap.2(m.thresholded[-2,][c(3,1,4,2,5:9),], dendrogram='none', Rowv=FALSE, Colv=FALSE,trace='none') #used to fix unusual input value used to run the code
+
+sum(alpha4$obj.ALPHA != 0)
+# 436
+sum(beta4$obj.BETA != 0)
+# 248
+
+#The highest lambdas with mean cor which is not more than 1 SE less than the max are:

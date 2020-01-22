@@ -142,3 +142,11 @@ sum(beta4$obj.BETA != 0)
 # 248
 
 #The highest lambdas with mean cor which is not more than 1 SE less than the max are:
+lam_y_4.5 <- nny[-2][c(3,1,4,2,5:9)][3] #.009
+lam_x_4.5 <- nnx[1] #.0096
+
+######### run 4.5
+alpha4.5 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_alpha_results4.5.csv")
+beta4.5 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_beta_results4.5.csv")
+#mac4 <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_mean_abs_corrs_results4.csv")
+#cv4 <- as.data.frame(fread("/workdir/users/fnn3/twins_uk/scca/twinsUK_cv_results4.csv", header=T, sep=','), row.names=1)

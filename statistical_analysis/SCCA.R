@@ -67,14 +67,14 @@ group <- rep(seq(from = 1, to = ncol(snp.residuals)/2), 2)
 #nnx <- c(0.00963166838580798, 0.007702851, 0.00577403350158676, 0.004617738, 0.0034614421450152, 0.002768261, 0.00207508004932683, 0.00124397780772249, 0.000745745103475914)
 
 # this is the tuning param pair used for the 4.5th run (resulting from 1 se rule):
-nny <- 0.008983289 #nny[-2][c(3,1,4,2,5:9)][3]
-nnx <- 0.009631668 #nnx[1]
+#nny <- 0.008983289 #nny[-2][c(3,1,4,2,5:9)][3]
+#nnx <- 0.009631668 #nnx[1]
 
-obj <- sCCA(snp.residuals, ab.residuals, 
+obj <- runCCA(snp.residuals, ab.residuals, 
             penalization_x = "glasso", penalization_y = "enet",
-            group_x = group,
-            grp_penalty_x = nnx, lasso_penalty_y = nny, 
-            cross_validate=FALSE) #changed to false
+            group_x = group, 
+            cross_validate=TRUE, parallel_CV = FALSE,
+            nlambda=12)
 
 #Output: we want ALPHA, BETA, CV_RESULTS
 fwrite(data.frame(obj$ALPHA), opt$alpha, row.names=T,quote=F)

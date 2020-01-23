@@ -22,13 +22,13 @@ This directory contains scripts, submission scripts, and documentation for proce
 This directory contains scripts and documentation for processing of the SNP data.
 
 * Preprocessing and reformatting
-* Filtering: HWE, LD, missingness
+* Filtering: HWE, LD, missingness, MAF
 
 /statistical_analysis
 ---------------------
 This directory contains scripts, submission scripts, and documentation for the statistical analysis of associating metagenomic data and SNPs.
 
-* PCA, extractign residuals from gene and SNP tables
+* PCA, linear mixed model to extract residuals
 * SCCA functions
 * SCCA
-* GAS 
+* SCCA post-processing

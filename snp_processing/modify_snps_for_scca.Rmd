@@ -153,3 +153,22 @@ library(propagate)
 sigmaY <- bigcor(Yc, fun="cov")
 ```
 
+
+
+## May 07, 2020 Recreating the SNP table for SCCA
+##I am trying to figure out where I made the files: BGI_twins_maf10_nomissing_hwe_ld.csv and BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv
+##All of my notes indicate this .Rmd, but it is not here. 
+##I need the SNP file to be coded like above, but I need the two columns of each SNP to be side-by-side.
+
+```{r, echo=F}
+snp <-  as.data.frame(fread("/workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld.csv", header=T, sep=','))
+  rownames(snp) <- snp[,1]
+  snp[,1] <- NULL
+
+n <- ncol(snp)
+seq <- rep(1:n, each=2) + (0:1) * n
+coded <- cbind(snp-1, 1-2*abs(snp-1))  
+coded.final <- coded[seq]
+
+fwrite(coded.final, "/workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv", quote=F, sep=',', row.names=T, col.names=T, showProgress = T)
+```

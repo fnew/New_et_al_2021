@@ -8,8 +8,8 @@ library("data.table")
 library("lme4")
 
 #Load functions
-source("./get_scca_functions.R")
-
+#sourcce("./get_scca_functions.R")
+source("./refactored_cca_functions.r")
 
 #Set command line options
 option_list=list(

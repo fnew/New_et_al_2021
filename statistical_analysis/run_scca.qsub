@@ -1,9 +1,9 @@
 #$ -S /bin/bash
 #$ -N scca
 #$ -V
-#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca_v2.err
-#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/scca_v2.out
-#$ -wd /workdir/users/fnn3/twins_uk/scca
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/scca_species.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/scca_species.out
+#$ -wd /workdir/users/fnn3/twins_uk/scca/species
 #$ -q long.q@cbsubrito2
 #$ -l h_vmem=50G
 #$ -pe parenv 1
@@ -16,16 +16,19 @@
 WRK=/workdir/users/fnn3
 
 #SNP and gene abun tables
-SNP=$WRK/twins_uk/scca/twins240_nomissHweLD_SNPresiduals_2.csv
-GENE=$WRK/twins_uk/scca/twins240_noissHweLD_GENEresiduals.csv
+#SNP=$WRK/twins_uk/scca/twins240_nomissHweLD_SNPresiduals_2.csv
+#GENE=$WRK/twins_uk/scca/twins240_noissHweLD_GENEresiduals.csv
+SNP=$WRK/twins_uk/scca/snp_residuals_mod.csv
+#GENE=$WRK/twins_uk/scca/abundance_residuals_mod.csv
+SPECIES=$WRK/twins_uk/scca/species/species_abundance_residuals_mod.csv
 
 #Output
-ALPHA=$WRK/twins_uk/scca/twinsUK_alpha_results.csv
-BETA=$WRK/twins_uk/scca/twinsUK_beta_results.csv
-CV=$WRK/twins_uk/scca/twinsUK_cv_results.csv
-CV2=$WRK/twins_uk/scca/twinsUK_cv2_results.csv
+ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_results.csv
+BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_results.csv
+CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_results.csv
+CV2=$WRK/twins_uk/scca/species/twinsUK_species_cv2_results.csv
 
 SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/SCCA2.R
 
-Rscript $SCRIPT -s $SNP -g $GENE -a $ALPHA -b $BETA -c $CV -m $CV2 
+Rscript $SCRIPT -s $SNP -g $SPECIES -a $ALPHA -b $BETA -c $CV -m $CV2 
 

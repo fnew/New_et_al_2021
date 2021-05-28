@@ -222,6 +222,11 @@ scca_front <- function(X,Y,
   A <- apply(A, 2, sb_x)
   B <- apply(B, 2, sb_y)
   
+  if (ncol(A)<num_components) { # just making sure A and B have the expected size
+    A <- cbind(A, matrix(NA, nrow=nrow(A), ncol=num_components-ncol(A)))
+    B <- cbind(B, matrix(NA, nrow=nrow(B), ncol=num_components-ncol(B)))
+  }
+  
   # return everything
   return(list('alpha'=A,'beta'=B,'all_other'=list_comps))
 }

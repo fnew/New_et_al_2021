@@ -172,3 +172,20 @@ coded.final <- coded[seq]
 
 fwrite(coded.final, "/workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv", quote=F, sep=',', row.names=T, col.names=T, showProgress = T)
 ```
+```{r, echo=F}
+#The SNPs do not need to be rerun through to the residuals, the residuals just need to be reordered.
+library(data.table)
+resid <- as.data.frame(fread("/workdir/users/fnn3/twins_uk/scca/twins240_noissHweLD_SNPresiduals.csv", header=T,sep=","))
+  dim(resid)
+  resid[1:10,1:10]
+  rownames(resid) <- resid[,1]
+  resid[,1] <- NULL
+
+m <- ncol(resid)
+seq <- rep(1:n, each=2) + (0:1) * n
+resid.re <- resid[seq]
+resid.re[1:10,1:10]
+
+
+fwrite(resid.re, "/workdir/users/fnn3/twins_uk/scca/twins240_nomissHweLD_SNPresiduals_2.csv", quote=F, sep=',', row.names=T, col.names=T)
+```

@@ -1,0 +1,37 @@
+#$ -S /bin/bash
+#$ -N scca_cmp2
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/scca_cmp2.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/scca_cmp2.out
+#$ -wd /workdir/users/fnn3/twins_uk/scca/species
+#$ -q long.q@cbsubrito2
+#$ -l h_vmem=50G
+#$ -pe parenv 1
+
+
+##This script runs the SCCA code given the SNP and gene abundace tables
+##This is the second version using the refactored cca functions
+
+#Set directries
+WRK=/workdir/users/fnn3
+
+#SNP and gene abun tables
+#SNP=$WRK/twins_uk/scca/gene_results/twins240_deflatedSNPs_scca.csv
+#GENE=$WRK/twins_uk/scca/gene_results/twins240_deflatedGenes_scca.csv
+SNP=$WRK/twins_uk/scca/species/twins240_deflatedSNPs_species_scca.csv
+SPECIES=$WRK/twins_uk/scca/species/twins240_deflatedSpecies_scca.csv
+
+
+#Output
+#ALPHA=$WRK/twins_uk/scca/gene_results/twinsUK_alpha_comp2_results.csv
+#BETA=$WRK/twins_uk/scca/gene_results/twinsUK_beta_comp2_results.csv
+#CV=$WRK/twins_uk/scca/gene_results/twinsUK_cv_comp2_results.csv
+
+ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_comp2_results.csv
+BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_comp2_results.csv
+CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_comp2_results.csv
+
+SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/SCCA2.R
+
+Rscript $SCRIPT -s $SNP -g $SPECIES -a $ALPHA -b $BETA -c $CV 
+

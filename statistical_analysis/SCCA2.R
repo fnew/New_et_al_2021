@@ -7,9 +7,8 @@ library("optparse")
 library("data.table")
 library("lme4")
 
-
 #Load functions
-#sourcce("./get_scca_functions.R")
+#source("./get_scca_functions.R")
 source("./refactored_cca_functions.r")
 
 #Set command line options
@@ -24,34 +23,29 @@ option_list=list(
 opt_parser=OptionParser(option_list=option_list);
 opt=parse_args(opt_parser);
 
-
 #Import SNP and abundance residuals
 X1.a <- as.data.frame(fread(opt$snp, header=T, sep=','), row.names=1)  
 rownames(X1.a) <- X1.a[,1]
 X1.a[,1] <- NULL
 
-X2.a <- as.data.frame(fread(opt$gene, header=T, sep=','), row.names=1)
+X2.a <- as.data.frame(fread(opt$gene, header=T, sep='\t'), row.names=1)
 rownames(X2.a) <- X2.a[,1]
 X2.a[,1] <- NULL
-
 
 #Sort all datasets by rowname
 snp.residuals <- X1.a[ order(row.names(X1.a)), ]
 ab.residuals  <- X2.a[ order(row.names(X2.a)), ]
 
-
 #Code to get output
 p = ncol(snp.residuals)/2
 group <- rep(1:p, each = 2)
 
-
 obj <- scca_front(snp.residuals, ab.residuals, 
             penalization_x = "glasso", penalization_y = "enet",
-            num_components=2,
+            num_components=1,
             group_x = group, 
             cross_validate=TRUE, parallel_CV = FALSE,
             nlambda=12)
-
 
 #Output: we want ALPHA, BETA, CV_RESULTS
 fwrite(data.frame(obj$alpha), opt$alpha, row.names=T,quote=F)

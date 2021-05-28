@@ -1,8 +1,8 @@
 #$ -S /bin/bash
 #$ -N getResiduals
 #$ -V
-#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/resids.err
-#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/resids.out
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/species_resids.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/species_resids.out
 #$ -wd /workdir/users/fnn3/twins_uk/scca
 #$ -q long.q@cbsubrito2
 #$ -l h_vmem=50G
@@ -16,15 +16,19 @@ WRK=/workdir/users/fnn3
 
 #SNP and gene abun tables
 SNP=$WRK/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe_ld_ADcode.csv
-GENE=$WRK/twins_uk/gene_abundance/twins240_function_abundance_filt25.csv
+#GENE=$WRK/twins_uk/genes/abundance/BGI240_KO_only_geneFamily_table_filt10.txt
+SPECIES=$WRK/twins_uk/taxa/abundance/twinsUK240_species_abundance_gmeanNormalized_filt10.txt
+
 
 #Metadata table
 META=$WRK/twins_uk/metadata/twinsUK240_zyg_age_ship_bmi_family.csv
 
 #Output
-SNP_RESID=$WRK/twins_uk/scca/snp_residuals_reducedSet.csv
-AB_RESID=$WRK/twins_uk/scca/abundance_residuals_reducedSet.csv
+SNP_RESID=$WRK/twins_uk/scca/bmi_test/snp_residuals.csv
+#AB_RESID=$WRK/twins_uk/scca/abundance_residuals.csv
+AB_RESID=$WRK/twins_uk/scca/bmi_test/species_abundance_residuals.csv
+P=$WRK/twins_uk/scca/bmi_test/list_of_xi_species.csv
 
-SCRIPT=$WRK/scripts/twins_uk/scca/getResiduals.R
+SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/getResiduals.R
 
-Rscript $SCRIPT -s $SNP -g $GENE -m $META -r $SNP_RESID -e $AB_RESID
+/programs/R-4.0.0/bin/Rscript $SCRIPT -s $SNP -g $SPECIES -m $META -p $P -r $SNP_RESID -e $AB_RESID

@@ -8,6 +8,7 @@ library("data.table")
 library("lme4")
 
 #Load functions
+#source("./get_scca_functions.R")
 source("./refactored_cca_functions.r")
 
 #Set command line options
@@ -26,14 +27,11 @@ opt=parse_args(opt_parser);
 X1.a <- as.data.frame(fread(opt$snp, header=T, sep=','), row.names=1)  
 if (ncol(X1.a) == 1){
     X1.a <- as.data.frame(fread(opt$snp, header=T, sep='\t'), row.names=1)}
-rownames(X1.a) <- X1.a[,1] 
-X1.a[,1] <- NULL
 
 X2.a <- as.data.frame(fread(opt$gene, header=T, sep=','), row.names=1) #\t or ,
 if (ncol(X2.a) == 1){ 
     X2.a <- as.data.frame(fread(opt$gene, header=T, sep='\t'), row.names=1)}
-rownames(X2.a) <- X2.a[,1]
-X2.a[,1] <- NULL
+
 
 #Sort all datasets by rowname
 snp.residuals <- X1.a[ order(row.names(X1.a)), ]
@@ -54,3 +52,4 @@ obj <- scca_front(snp.residuals, ab.residuals,
 fwrite(data.frame(obj$alpha), opt$alpha, row.names=T,quote=F)
 fwrite(data.frame(obj$beta), opt$beta, row.names=T,quote=F)
 fwrite(data.frame(obj$all_other[[1]][[1]]$abs_cors), opt$cv, quote=F)
+#fwrite(data.frame(obj$all_other[[2]][[1]]$abs_cors), opt$cv2, quote=F)

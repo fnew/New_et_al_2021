@@ -24,14 +24,10 @@ opt=parse_args(opt_parser);
 
 #Import SNP and abundance residuals
 X1.a <- as.data.frame(fread(opt$snp, header=T, sep=','), row.names=1)  
-if (ncol(X1.a) == 1){
-    X1.a <- as.data.frame(fread(opt$snp, header=T, sep='\t'), row.names=1)}
-rownames(X1.a) <- X1.a[,1] 
+rownames(X1.a) <- X1.a[,1] #Comment out for comp2
 X1.a[,1] <- NULL
 
-X2.a <- as.data.frame(fread(opt$gene, header=T, sep=','), row.names=1) #\t or ,
-if (ncol(X2.a) == 1){ 
-    X2.a <- as.data.frame(fread(opt$gene, header=T, sep='\t'), row.names=1)}
+X2.a <- as.data.frame(fread(opt$gene, header=T, sep='\t'), row.names=1) #\t or ,
 rownames(X2.a) <- X2.a[,1]
 X2.a[,1] <- NULL
 
@@ -45,6 +41,7 @@ group <- rep(1:p, each = 2)
 
 obj <- scca_front(snp.residuals, ab.residuals, 
             penalization_x = "glasso", penalization_y = "enet",
+            #relpenalty_x = .009, relpenalty_y = .009, ####### added on aug 13 to push through higher turning parameters 
             num_components=1,
             group_x = group, 
             cross_validate=TRUE, parallel_CV = FALSE,

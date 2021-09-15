@@ -70,7 +70,7 @@ scca_w_tuning <- function(Xdef, Ydef, n, p, q,
 
 #lam_eps=.01;nlambda=2;penalization_x="enet";relpenalty_x=.9;group_x=NA;alpha=c();penalization_y="enet";
 #relpenalty_y=.9;group_y=NA;beta=c();max_iterations=100;tolerance=10^-20;cross_validate=TRUE;
-#num_folds=5;parallel_CV=FALSE;num_cores=1;num_components=1
+#num_folds=5;parallel_CV=FALSE;num_cores=1;num_components=1;
 scca_front <- function(X,Y,
                        lam_eps = .01, nlambda = 12,
                        penalization_x = "enet", relpenalty_x = .9, group_x = NA,

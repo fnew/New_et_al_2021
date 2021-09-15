@@ -18,8 +18,8 @@ WRK=/workdir/users/fnn3
 #SNP and gene abun tables
 #SNP=$WRK/twins_uk/scca/gene_results/twins240_deflatedSNPs_scca.csv
 #GENE=$WRK/twins_uk/scca/gene_results/twins240_deflatedGenes_scca.csv
-SNP=$WRK/twins_uk/scca/species/twins240_deflatedSNPs_species_scca.csv
-SPECIES=$WRK/twins_uk/scca/species/twins240_deflatedSpecies_scca.csv
+SNP=$WRK/twins_uk/scca/species/twins240_deflatedSNPs_species_v2.csv
+SPECIES=$WRK/twins_uk/scca/species/twins240_deflatedSpecies_v2.csv
 
 
 #Output
@@ -27,9 +27,9 @@ SPECIES=$WRK/twins_uk/scca/species/twins240_deflatedSpecies_scca.csv
 #BETA=$WRK/twins_uk/scca/gene_results/twinsUK_beta_comp2_results.csv
 #CV=$WRK/twins_uk/scca/gene_results/twinsUK_cv_comp2_results.csv
 
-ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_comp2_results.csv
-BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_comp2_results.csv
-CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_comp2_results.csv
+ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_comp2_results_v2.csv
+BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_comp2_results_v2.csv
+CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_comp2_results_v2.csv
 
 SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/SCCA2.R
 

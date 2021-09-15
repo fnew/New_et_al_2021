@@ -79,7 +79,7 @@ get.residuals <- function(y, xi=1.78) {
     xi <- xi-delta
     if (xi<1.01) { # if xi gets too low, stop before error
       mod <- lmer(y ~ 1
-                   + Age.at.metagenomics.sample #+ IndividualBMI
+                   + Age.at.metagenomics.sample + IndividualBMI
                    + pcs
                    + (1|SampleShipmentNum)
                    + (0+dummy(twinstatus,"MZ")|IndividualFamilyID)
@@ -90,7 +90,7 @@ get.residuals <- function(y, xi=1.78) {
     tryCatch({
       #if (xi>1.72) error()
       mod <- glmer(y ~ 1
-                   + Age.at.metagenomics.sample #+ IndividualBMI
+                   + Age.at.metagenomics.sample + IndividualBMI
                    + pcs
                    + (1|SampleShipmentNum)
                    + (0+dummy(twinstatus,"MZ")|IndividualFamilyID)
@@ -108,7 +108,7 @@ get.residuals <- function(y, xi=1.78) {
 get.snpresiduals <- function(y) {
   mod <- lmer(y ~ 1
                + Age.at.metagenomics.sample
-               + pcs   #+ IndividualBMI
+               + pcs   + IndividualBMI
                + (0+dummy(twinstatus,"MZ")|IndividualFamilyID)
                + (0+dummy(twinstatus,"DZ")|IndividualFamilyID),
                data = meta.s #,family=gaussian(link = "identity")
@@ -131,7 +131,7 @@ snp.residuals <- matrix(NA, nrow=nrow(X1.as), ncol=ncol(X1.as))
 # }
 
 #Using the function
-snp.residuals <- apply(X1.as, 2, get.snpresiduals)
+#snp.residuals <- apply(X1.as, 2, get.snpresiduals)
 
 ab.residuals.and.xi <- apply(X2.as, 2, get.residuals)
 ab.residuals <- lapply(ab.residuals.and.xi, function(v) v[[2]])
@@ -141,6 +141,6 @@ ab.xi <- lapply(ab.residuals.and.xi, function(v) v[[1]])
 ab.xi <- as.data.frame(unlist(ab.xi))
 
 #Output the residuals for future use
-fwrite(snp.residuals, opt$residuals1, quote=F, sep=',', row.names=T, col.names=T)
+#fwrite(snp.residuals, opt$residuals1, quote=F, sep=',', row.names=T, col.names=T)
 fwrite(ab.residuals, opt$residuals2, quote=F, sep='\t', row.names=T, col.names=T)
 fwrite(ab.xi, opt$plist, quote=F, sep='\t', row.names=T, col.names=T)

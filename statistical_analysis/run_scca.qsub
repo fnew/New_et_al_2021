@@ -20,13 +20,13 @@ WRK=/workdir/users/fnn3
 #GENE=$WRK/twins_uk/scca/twins240_noissHweLD_GENEresiduals.csv
 SNP=$WRK/twins_uk/scca/snp_residuals_mod.csv
 #GENE=$WRK/twins_uk/scca/abundance_residuals_mod.csv
-SPECIES=$WRK/twins_uk/scca/species/species_abundance_residuals_mod.csv
+SPECIES=$WRK/twins_uk/scca/species/species_abundance_residuals_v2.csv
 
 #Output
-ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_results.csv
-BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_results.csv
-CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_results.csv
-CV2=$WRK/twins_uk/scca/species/twinsUK_species_cv2_results.csv
+ALPHA=$WRK/twins_uk/scca/species/twinsUK_species_alpha_results_vTest.csv
+BETA=$WRK/twins_uk/scca/species/twinsUK_species_beta_results_vTest.csv
+CV=$WRK/twins_uk/scca/species/twinsUK_species_cv_results_vTest.csv
+CV2=$WRK/twins_uk/scca/species/twinsUK_species_cv2_results_vTest.csv
 
 SCRIPT=$WRK/scripts/snp_metagenomes/statistical_analysis/SCCA2.R
 

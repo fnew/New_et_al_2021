@@ -16,6 +16,14 @@ This directory contains scripts, submission scripts, and documentation for proce
 * Alignments
 * Gene abundance calculations
 * Creating the abundance table
+* and more
+
+/taxonomic_data_processing
+--------------------------
+This directory contains scripts, submission scripts, and R markdowns for processing and visualizing the taxonomic assignments of the metagenomic data.
+
+* Kraken2 and Bracken 
+* Species visualizations in R
 
 /snp_processing
 ---------------

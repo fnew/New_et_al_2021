@@ -1,0 +1,30 @@
+#$ -S /bin/bash
+#$ -N aln_twin
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/bwa_aln_assembly.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=16G
+#$ -pe parenv 4
+#$ -t 1-4
+#$ -q long.q@cbsubrito2
+
+
+## Running 4 alignments to try to figure out why they did not align properly on Xsede
+
+WRK=/workdir/users/fnn3
+OUT=$WRK/twins_uk/alignments
+
+DESIGN_FILE=$WRK/design_files/unfinished_das_twins.txt
+  DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+  NAME=`basename $DESIGN`
+
+
+FQ=/workdir/data/twins/3-derep
+REF=$WRK/twins_uk/assembly/assemblies/${NAME}
+
+R1=$FQ/${NAME}_1.fastq
+R2=$FQ/${NAME}_2.fastq
+
+
+bwa mem -a -t 4 $REF $R1 $R2 | samtools sort -o $OUT/${NAME}_contigs.sorted.bam -
+samtools index $OUT/${NAME}_contigs.sorted.bam

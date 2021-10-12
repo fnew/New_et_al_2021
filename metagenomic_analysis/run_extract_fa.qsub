@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N extractFA
+#$ -V
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_fxn/extract_fasta.out
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/extract_fasta.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes
+#$ -l h_vmem=5G
+#$ -q long.q@cbsubrito2
+#$ -pe parenv 1
+
+#Script to extract fasta sequences from the nucleotide file, given a list of protein headers from the clustered (90%) file
+#Genes clustered in the protein space
+
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/twins_uk/genes/cdhit/chunks/chunk_list.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+FETCH=$WRK/scripts/general_use/fastafetcher2.py
+
+WANT=$WRK/twins_uk/genes/cdhit/clustered90_gene_headers.txt
+FA=$WRK/twins_uk/genes/prodigal/BGI_twins_all_prodigal_genes.fa
+OUT=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_genes.fa
+
+#WANT=$WRK/twins_uk/genes/abundance/twinsUK_aligned_genes.txt
+#OUT=$WRK/twins_uk/genes/abundance/BGI_twins_derep_clust90_aligned_genes.fa
+
+python2 $FETCH -f $FA -k $WANT -o $OUT -m exact

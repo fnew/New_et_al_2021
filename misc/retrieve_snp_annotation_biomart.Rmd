@@ -1,0 +1,582 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+#Getting info from the SCCA SNPs using biomart
+```{r, echo=F, eval=F}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("biomaRt")
+
+library("biomaRt")
+library(plotly)
+library(ggplot2)
+library(ggthemes)
+
+library(tidyr)
+library(tibble)
+library(hrbrthemes)
+library(dplyr)
+library(reshape2)
+library(cluster)
+```
+
+
+#Read in list of rs IDs and try to get info
+```{r, echo=F}
+snp <- read.csv("/workdir/users/fnn3/twins_uk/scca/nonzero_snp_list.txt", header=T)
+
+listMarts()
+
+mart <- useMart("ENSEMBL_MART_SNP")
+listDatasets(mart)
+dataset <- useDataset("hsapiens_snp", mart=mart)
+listFilters(dataset)
+listAttributes(dataset)
+
+snp.info <- getBM(attributes=c("refsnp_id", "chr_name", "chrom_start","chrom_end", "validated", "allele", "minor_allele", "minor_allele_freq", "clinical_significance", "associated_gene", "phenotype_name", "phenotype_description", "ensembl_gene_stable_id","consequence_type_tv"),
+      filters= "snp_filter",
+      values=snp,
+      mart=dataset)
+
+write.table(snp.info, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_biomart.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+
+getBM(attributes = c("refsnp_id", "chr_name", "chrom_start","chrom_end", "validated", "allele",  "minor_allele", "minor_allele_freq", "clinical_significance", "associated_gene", "phenotype_name", "phenotype_description", "ensembl_gene_stable_id","consequence_type_tv"),
+      filters= "snp_filter",
+      values=c("rs12535987"),
+      mart=dataset)
+
+
+#Can i get the gene IDs from the ensembl IDs? 
+mart2 <- useMart("ENSEMBL_MART_ENSEMBL", dataset="hsapiens_gene_ensembl")
+listDatasets(mart2)
+dataset2 <- useDataset("hsapiens_gene_ensembl", mart=mart2)
+listAttributes(dataset2)
+listFilters(dataset2)
+gene.id <- snp.info$ensembl_gene_stable_id[which(snp.info$ensembl_gene_stable_id != "")]
+
+
+
+getBM(attributes = c("entrezgene_id", "entrezgene_description", "external_gene_name", "go_id","name_1006","definition_1006", "go_linkage_type", "hgnc_id","hgnc_symbol","kegg_enzyme"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+gene.info <- getBM(attributes = c("entrezgene_id", "entrezgene_description", "ensembl_gene_id", "external_gene_name"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+colnames(gene.info) <- c("entrezgene_id","entrezgene_description","ensembl_gene_stable_id","external_gene_name")
+snp.gene <- merge(snp.info, gene.info, by="ensembl_gene_stable_id", all.x=T)
+
+write.table(snp.gene, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+
+#I want to check the full set of SNPs tested, too, so that i can do a GO term enrichment, or something of the sort.
+full.snp <- read.csv("/workdir/users/fnn3/twins_uk/scca/twinsUK_all_snp_tested_list.txt",header=F)
+  colnames(full.snp) <- c("refsnp_id")
+
+  listMarts()
+
+mart <- useMart("ENSEMBL_MART_SNP")
+listDatasets(mart)
+dataset <- useDataset("hsapiens_snp", mart=mart)
+listFilters(dataset)
+listAttributes(dataset)
+
+full.snp.info <- getBM(attributes=c("refsnp_id", "chr_name", "chrom_start","chrom_end", "validated", "allele", "minor_allele", "minor_allele_freq", "clinical_significance", "associated_gene", "phenotype_name", "phenotype_description", "ensembl_gene_stable_id","consequence_type_tv"),
+      filters= "snp_filter",
+      values=full.snp,
+      mart=dataset)
+
+#Now get entrezID
+mart2 <- useMart("ENSEMBL_MART_ENSEMBL")
+listDatasets(mart2)
+dataset2 <- useDataset("hsapiens_gene_ensembl", mart=mart2)
+listAttributes(dataset2)
+listFilters(dataset2)
+gene.id <- full.snp.info$ensembl_gene_stable_id[which(full.snp.info$ensembl_gene_stable_id != "")]
+
+
+gene.info2 <- getBM(attributes = c("entrezgene_id",  "ensembl_gene_id", "go_id", "arrayexpress", "hpa_accession", "hpa_id"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+colnames(gene.info2) <- c("entrezgene_id","entrezgene_description","ensembl_gene_stable_id","external_gene_name")
+full.snp.gene <- merge(full.snp.info, gene.info2, by="ensembl_gene_stable_id", all.x=T)
+write.table(snp.gene, file="/workdir/users/fnn3/twins_uk/scca/full_snp_annotation_wGene_biomart.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+
+
+
+#gene expression
+
+gene.express <- getBM(attributes = c("entrezgene_id",  "ensembl_gene_id",  "arrayexpress"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+
+# human protein atlas
+gene.hpa <- getBM(attributes = c("entrezgene_id",  "ensembl_gene_id", "hpa_accession", "hpa_id"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+
+#go
+gene.go <- getBM(attributes = c("entrezgene_id",  "ensembl_gene_id", "go_id", "name_1006", "definition_1006"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+```
+
+
+```{r, echo=F}
+##I have two lists of genes now -- full set background and the cca list. 
+
+```
+
+
+#Can biomart do this for microbial genes with KO numbers?
+```{r, echo=F}
+mgene <- read.csv("/workdir/users/fnn3/twins_uk/scca/nonzero_snp_list.txt", header=T)
+
+listMarts()
+
+```
+
+
+
+
+#DisGeneT has an R package -- look for gene-variant-disease associations
+```{r, echo=F}
+library(devtools)
+install_bitbucket("ibi_group/disgenet2r")
+library("disgenet2r")
+
+results <- variant2disease( variant= snp, database = "CURATED")
+```
+
+
+
+
+##Juan output lists of SNPs from microbiome GWAS papers. I'm going to import them and look for overlap with my results.
+```{r, echo=F}
+davenport <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Davenport_S7_rsids.txt", header=F)
+ colnames(davenport) <- c("refsnp_id")
+ davenport$source <- c("davenport")
+goodrich <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Goodrich_S5_rsids.txt", header=F)
+  colnames(goodrich) <- c("refsnp_id")
+  goodrich$source <- c("goodrich")
+hughes <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Hughes_S5_rsids.txt", header=F)
+  colnames(hughes) <- c("refsnp_id")
+  hughes$source <- c("hughes")
+wang <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Wang_T2_rsids.txt", header=F)
+  colnames(wang) <- c("refsnp_id")
+  wang$source <- c("wang")
+turpin <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Turpin_S6_rsids.txt", header=F)
+  colnames(turpin) <- c("refsnp_id")
+  turpin$source <- c("turpin")
+rothschild14 <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Rothschild_S14_rsids.txt", header=F)
+  colnames(rothschild14) <- c("refsnp_id")
+  rothschild14$source <- c("rothschild14")
+rothschild26 <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Rothschild_S26_rsids.txt", header=F)
+  colnames(rothschild26) <- c("refsnp_id")
+  rothschild26$source <- c("rothschild26")
+igartua <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Igartua_T2_rsids.txt", header=F)
+  colnames(igartua) <- c("refsnp_id")
+  igartua$source <- c("igartua")
+bonder <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Bonder_S3_rsids.txt", header=F)
+  colnames(bonder) <- c("refsnp_id")
+  bonder$source <- c("bonder")
+blekhman <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Blekhman_S5_rsids.txt", header=F)
+  colnames(blekhman) <- c("refsnp_id")
+  blekhman$source <- c("blekhman")
+
+ext_gwas <- rbind(davenport, goodrich, hughes, wang, turpin, rothschild14, rothschild26, igartua, bonder, blekhman)
+ext_check <- merge(snp.gene, ext_gwas, by="refsnp_id", all.x=T) #none overlap...
+
+#Try the latest paper,Kurilshikov et al 
+kurilshikov <- read.csv("/workdir/users/fnn3/references/gwas_annotation/MBG.allHits.p1e4.txt",sep="\t")
+mine.kur <- merge(snp.gene, kurilshikov, by.x="refsnp_id", by.y="rsID", all.x=T) 
+#Three overlap... TNFAIP8, then two without genes but organisms
+
+
+```
+
+
+##Look at Allele frequencies of the selected SNPs
+```{r, echo=F}
+all.freq <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/plink2.afreq", header=F)
+  colnames(all.freq) <- c("CHROM","ID","REF","ALT","ALT_FREQ","OBS_CT")
+
+ggplot(all.freq, aes(x=reorder(ID, ALT_FREQ), y=ALT_FREQ)) +
+  geom_bar(stat="identity") +
+ theme(axis.text.x=element_blank(), 
+       panel.grid.minor=element_blank(), 
+       panel.grid.major=element_blank()) +
+  xlab("SNP") + ylab("Alternative Allele Frequency") 
+ 
+   
+#plt %>% ggplotly
+  
+  ref.freq <- read.table("/workdir/users/fnn3/twins_uk/scca/plink2.afreq.ref.bins", header=F)
+  colnames(ref.freq) <- c("ReferenceAlleleFreq","Count")
+ref.freq$AltAlleleFreq <- 1 - ref.freq$ReferenceAlleleFreq
+
+ggplot(ref.freq, aes(x=ReferenceAlleleFreq, y=Count)) +
+    geom_bar(stat="identity") +
+    ylab("Number of SNPs") + xlab('Reference Allele Frequency Range') +
+  ggtitle("Reference Allele Frequency")
+
+pdf("/workdir/users/fnn3/twins_uk/scca/minor_allele_freq_cca.pdf", height=6, width=12)
+ggplot(all.freq, aes(x=reorder(ID, ALT_FREQ), y=ALT_FREQ)) +
+  geom_bar(stat="identity") +
+  theme_few() +
+  theme(axis.text.x=element_blank()) +
+  xlab("SNP") + ylab("Alternative Allele Frequency")  +
+  ggtitle("Alternate Allele Frequency")
+dev.off()
+
+ggplot(ref.freq, aes(x=ReferenceAlleleFreq, y=Count)) +
+    geom_bar(stat="identity") +
+    ylab("Number of SNPs") + xlab('Reference Allele Frequency Range') +
+    theme_few()
+
+```
+
+
+
+```{r, echo=F}
+cons <- read.csv("/workdir/users/fnn3/twins_uk/scca/snp_consequence.txt", header=T)
+plot(cons$consequence_type_tv)
+
+pdf ("/workdir/users/fnn3/twins_uk/scca/variant_types.pdf", height=5, width=10)
+ggplot(cons, aes(x=consequence_type_tv)) +
+  geom_bar(stat="count") +
+  theme_few() +
+  coord_flip() +
+  theme(axis.text.x = element_text( size=12, vjust=0.5),
+        axis.text.y = element_text(size=12),
+        axis.title.y = element_blank()) +
+  ggtitle("Variant Consequence Type") 
+dev.off()
+```
+
+
+```{r}
+###Parse the GWAS hit information for all genes
+gwas <- read.table("/workdir/users/fnn3/twins_uk/scca/humna_gene_gwas_lit_search.txt", header=T, sep="\t")
+gene_list_final <- as.data.frame(gwas$external_gene_name)
+colnames(gene_list_final) <- c("gene")
+
+gwas$BMI <-   grepl("BMI", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Acute.myeloid.cancer <- grepl("acute myeloid leukemia", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Breast.cancer <- grepl("breast cancer", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Prostate.cancer <- grepl("prostate cancer", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Heel.bone.mineral.density <- grepl("heel bone mineral density", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Colorectal.cancer <- grepl("CRC", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Body.size <- grepl("body size", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Weight <- grepl("weight", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Height <- grepl("height", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Alcohol <- grepl("alcohol", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Crohns <- grepl("Crohn's", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Alzheimers <- grepl("Alzheimer's", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Parkinsons <- grepl("Parkinson's", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$BP <- grepl("blood pressure", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Schizophrenia <- grepl("schizophrenia", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Type2.diabetes <- grepl("T2D", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$LDL.cholesterol <- grepl("LDL", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$HDL.cholesterol <- grepl("HDL", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$COPD <- grepl("COPD", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Colorectal.health <- grepl("colorectal health", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Triglycerides <- grepl("triglyceride", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Cholesterol <- grepl(", cholesterol", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Smoking <- grepl("smoking", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Metabolite.levels <- grepl("metabolite levels", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Blood.cell.counts <- grepl("count", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Type1.diabetes <- grepl("T1D", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Obesity <- grepl("obesity", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Asthma <- grepl("asthma", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Allergy <- grepl("allerg", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Multiple.sclerosis <- grepl("MS", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Gout <- grepl("gout", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Lupus <- grepl("lupus", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Eczema <- grepl("eczema", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Apolipoproteins <- grepl("apolipoprotein", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Depression <- grepl("depression", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Dental.caries <- grepl("dental caries", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Ovarian.cancer <- grepl("ovarian cancer", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Chronic.kidney.disease <- grepl("kidney disease", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Coronary.artery.disease <- grepl("coronary artery disease", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Endometrial.cancer <- grepl("endometrial cancer", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Lung.cancer <- grepl("lung cancer", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Venous.thromboembolism <- grepl("venous", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Rheumatoid.arthritis <- grepl("RA", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Drug.or.treatment.response <- grepl("response",gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Epilepsy <- grepl("epilepsy", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Testosterone <- grepl("testosterone", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+gwas$Menarche <- grepl("menarche", gwas$pub_for_gene.GWAS.Catalog., fixed=T)
+
+
+gwas <- gwas[-c(4:10)]
+#gwas %>%
+ # mutate_if(is.logical, as.numeric)
+
+gwas2 <- gwas[c(1,3:50)]
+gwas3 <- gwas2 %>% mutate_if(is.logical, as.numeric)
+
+gwas.m <- melt(gwas3)
+
+ggplot(gwas.m, aes(external_gene_name, variable)) +
+  geom_tile(aes(fill=as.factor(value))) +
+  theme(axis.text.x = element_text(angle=90, size=14, vjust=0.5),
+        axis.text.y = element_text(size=14, vjust=0.5),
+        legend.text= element_text(size=18),
+        legend.title= element_text(size=22),
+        axis.title.x = element_text(size=22),
+        axis.title.y = element_text(size=22)) +
+  scale_fill_manual(name=c("Published in\n previous GWAS"),
+                    values=c("light grey", "blue"),
+                    breaks=c("0","1"),
+                    labels=c("No hit","GWAS Hit"))
+  
+  
+gm <- unique(gwas3)
+row.names(gm) <- gm[,1]
+gm[,1] <- NULL
+gm2 <- as.matrix(gm)
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gwas_gene_hits_heatmap.pdf",height=20, width=20)
+heatmap(gm2, scale="none", col = c("grey97", "skyblue4"), margins = c(10,10))
+dev.off()
+
+heatmap(gm2, scale="none", col = c("grey97", "skyblue4"), cexRow = 2, cexCol = 2)
+
+#library(heatmap3)
+#heatmap3(gm2, scale="none", )
+
+library(pheatmap)
+pheatmap(gm2)
+
+
+
+##########################################BAR PLOT
+#Make a bar plot of the GWAS traits
+forplot <- as.data.frame(table(gwas.m$variable, gwas.m$value))
+forplot2 <- forplot[c(49:96),]
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/gwas_traits_barplot.svg", height=10, width=10)
+ggplot(forplot2, aes(reorder(Var1, -Freq), Freq )) +
+  geom_bar(stat="identity") +
+  xlab("GWAS Trait") + ylab("Number of publications") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.title.y = element_text(size=14),
+        axis.text.y = element_text(size=12))
+dev.off()
+```
+
+
+
+```{r}
+##Someone made an R package for retrieving data from the human protein atlas!!!
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("HPAanalyze")
+library("HPAanalyze")
+
+test <- c('ADARB2', 'ADH4','BACE2','ADGRB3','AUTS2')
+ttest <- c("brain","breast","adipose tissue")
+hpa.data <- hpaDownload(downloadList = 'Normal tissue')
+hpaSubset(hpa.data, 
+          targetGene = test)
+hpaVisTissue(hpa.data, targetGene= test)
+
+#ccaGenes <- as.character(expression(gene_list_final$gene))
+#ccaGenes <- paste0(sprintf('"%s"', gene_list_final$gene), collapse = ", ")
+ccaGenes <- gene_list_final$gene
+target_tissue <- hpaListParam(hpa.data)$normal_tissue
+target_tissue <- c("adipose tissue",   "adrenal gland",    "appendix",         "bone marrow",      "breast",           "bronchus",         "caudate",          "cerebellum",       "cerebral cortex",  "cervix, uterine",  "colon",            "duodenum",         "endometrium 1",    "endometrium 2",   "epididymis",       "esophagus",        "fallopian tube",   "gallbladder",      "heart muscle",     "hippocampus",      "kidney",          "liver",            "lung",             "lymph node",       "nasopharynx",      "oral mucosa",      "ovary",            "pancreas",        "parathyroid gland","placenta",         "prostate",         "rectum",           "salivary gland",   "seminal vesicle",  "skeletal muscle", "skin 1",           "skin 2",           "small intestine",  "smooth muscle",    "soft tissue 1",    "soft tissue 2",    "spleen",          "stomach 1",        "stomach 2",        "testis",           "thyroid gland",    "tonsil",           "urinary bladder",  "vagina",          "hypothalamus",     "hair",             "retina",           "lactating breast", "skin",             "thymus",           "cartilage",       "eye",              "pituitary gland",  "dorsal raphe",     "choroid plexus",   "substantia nigra", "sole of foot")
+
+hpaVis(hpa.data, targetGene=ccaGenes,
+       targetTissue = target_tissue )
+
+my.subset<- hpaSubset(hpa.data,
+          targetGene=ccaGenes,
+          targetCellType=NULL)
+hpaSubset(hpa.data,
+          targetGene=ccaGenes)
+
+
+
+dat <- as.data.frame(my.subset$normal_tissue)
+dat.test <- dat
+dat.test$tissue_cell <- paste0(dat.test$tissue,"_",dat$cell_type)
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gene_expression_by_tissue.pdf", width=25, height=18)
+ggplot(dat, aes(gene, tissue)) +
+  geom_tile(aes(fill=level)) +
+  theme(axis.text.x = element_text(angle=90, size=14, vjust=0.5),
+        axis.text.y = element_text(size=14, vjust=0.5),
+        legend.text= element_text(size=18),
+        legend.title= element_text(size=22),
+        axis.title.x = element_text(size=22),
+        axis.title.y = element_text(size=22)) +
+  scale_fill_manual(values=c("#4D004B", "#810F7C", "#88419D", "#F7FCFD", "#E0ECF4", "white"),
+                    breaks=c("High","Medium","Low","Not representative","Not detected", "N/A"),
+                    labels=c("High","Medium","Low","Not representative","Not detected", "N/A"))
+dev.off()
+
+#Filter dat
+
+
+#Need to cast the data and create a numeric matrix in order to run heatmap
+
+dat2 <- unique(dat.test[-c(241,326,3055,3820,3981,4496,4821),c(2,5,7)])
+dat2[is.na(dat2)] <- "Not detected"
+ 
+
+
+dat3 <- reshape2::dcast(dat2, gene~tissue_cell, value.var="level")
+row.names(dat3) <- dat3[,1]
+dat3[,1] <- NULL
+dat3[is.na(dat3)] <- "Not detected"
+dat4 <- Filter(function(x) length(unique(x)) >1, dat3) 
+
+
+
+dat3b <- reshape2::dcast(dat2, tissue_cell~gene, value.var="level")
+row.names(dat3b) <- dat3b[,1]
+dat3b[,1] <- NULL
+dat3b[is.na(dat3b)] <- "Not detected"
+dat4b <- Filter(function(x) length(unique(x)) >1, dat3b)
+
+
+
+
+x <- dat3 %>% mutate_if(is.character, as.ordered)
+
+y <- dat3b %>% mutate_if(is.character, as.ordered) 
+
+
+
+exp.distx <- daisy(x, metric=c("gower"))
+exp.disty <- daisy(y, metric=c("gower"))
+
+row.order= hclust(exp.distx)$order
+col.order = hclust(exp.disty)$order
+
+dat_new <- dat3[row.order, col.order]
+dat_new2 <- Filter(function(x) length(unique(x)) >1, dat_new)
+
+df_molten_dat <- reshape2::melt(as.matrix(dat_new2))
+names(df_molten_dat)[c(1:2)] <- c("Gene","Tissue_CellType")
+
+df_molten_dat2 <- df_molten_dat[-c(548:553,3470),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gene_expression_heatmap_cluster.pdf", height=25, width=18)
+ggplot(df_molten_dat, aes(Gene, Tissue_CellType, fill=value)) +
+  geom_tile() +
+  theme(axis.text.x = element_text(angle=90, size=14, vjust=0.5),
+        axis.text.y = element_text(size=14, vjust=0.5),
+        legend.text= element_text(size=18),
+        legend.title= element_text(size=22),
+        axis.title.x = element_text(size=22),
+        axis.title.y = element_text(size=22)) +
+  scale_fill_manual(name = c("Expression"),
+                    values=c("#4D004B", "#810F7C", "#88419D", "#E0ECF4"),
+                    breaks=c("High","Medium","Low","Not detected"),
+                    labels=c("High","Medium","Low","Not detected"))
+  dev.off()
+  
+
+
+```
+
+
+```{r}
+#Try the gene expression heat map one more time -- using just present or absent
+dat2 <- unique(dat.test[-c(241,326,3055,3820,3981,4496,4821),c(2,3,5)])
+dat2[is.na(dat2)] <- "Not detected"
+dat3 <- dat2 %>% mutate(expression = ifelse(level == "High"| level =="Medium" | level=="Low" ), "Detected",
+                        ifelse( level == "Not detected", "Not dectected"))
+dat2$expression[dat2$level == "High" | dat2$level == "Medium" |  dat2$level == "Low"] <- "1"
+dat2$expression[dat2$level == "Not detected"] <- "0"
+
+dat3 <- unique(dat2[,c(1,2,4)])
+dat3$expression <- as.numeric(dat3$expression)
+
+dat4 <- reshape2::dcast(dat3, gene~tissue, value.var=("expression"), fun.aggregate=sum) #Now if the row is all not detected, it should be 0, and otherwise 1
+row.names(dat4) <- dat4[,1]
+dat4[,1] <- NULL
+#dat4[is.na(dat4)] <- "Not detected"
+#dat4 <- Filter(function(x) length(unique(x)) >1, dat3) 
+
+
+
+dat4b <- reshape2::dcast(dat3, tissue~gene, value.var="expression", sum)
+row.names(dat4b) <- dat4b[,1]
+dat4b[,1] <- NULL
+#dat4b[is.na(dat3b)] <- "Not detected"
+#dat4b <- Filter(function(x) length(unique(x)) >1, dat3b)
+
+row.order = hclust(dist(dat4))$order
+col.order = hclust(dist(dat4b))$order
+
+
+dat_new <- dat4[row.order, col.order]
+dat_new2 <- Filter(function(x) length(unique(x)) >1, dat_new)
+
+df_molten_dat <- reshape2::melt(as.matrix(dat_new2))
+names(df_molten_dat)[c(1:2)] <- c("Gene","Tissue")
+df_molten_dat$value <- as.factor(df_molten_dat$value)
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gene_expression_heatmap_cluster_aggregate_by_tissue.pdf", height=20, width=25)
+ggplot(df_molten_dat, aes(Gene, Tissue, fill=value)) +
+  geom_tile() +
+  theme(axis.text.x = element_text(angle=90, size=20, vjust=0.5),
+        axis.text.y = element_text(size=20, vjust=0.5),
+        legend.text= element_text(size=24),
+        legend.title= element_text(size=28),
+        axis.title.x = element_text(size=28),
+        axis.title.y = element_text(size=28)) + 
+  scale_fill_manual(name = c("Expression"),
+                    values=c("#4D004B",  "#E0ECF4"),
+                    breaks=c("1","0"),
+                    labels=c("Detected","Not detected"))
+  dev.off()
+  
+
+
+```
+
+```{r}
+yearly <- read.table("/workdir/users/fnn3/twins_uk/scca/gwas_trait_pubmed.txt",header=T)
+yearly2000 <- yearly[1:22,]
+yearlym <- reshape2::melt(yearly2000, id.vars=c("Year"))
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gwas_pubs_yearly.pdf", height=10, width=14)
+ggplot(yearlym, aes(fill=variable, x=Year, y=value)) +
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_brewer(name="Trait", palette = "RdYlBu") +
+  theme(axis.text.x= element_text(size=16),
+        axis.text.y = element_text(size=16),
+        axis.title.x = element_text(size=18),
+        axis.title.y = element_text(size=16),
+        legend.text = element_text(size=16),
+        legend.title = element_text(size=18)) +
+  ylab("Number of Publications in PubMed")
+dev.off()
+```
+
+
+

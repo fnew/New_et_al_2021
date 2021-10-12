@@ -1,0 +1,17 @@
+#$ -S /bin/bash
+#$ -N bwa_index
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/bwa_index.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/align
+#$ -l h_vmem=25G
+#$ -pe parenv 1
+#$ -q long.q@cbsubrito2
+
+
+#Script to create the bwa index
+
+WRK=/workdir/users/fnn3
+FA=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_genes_derep.fa
+
+cd $WRK/twins_uk/genes/cdhit
+bwa index -a bwtsw -p BGI_twins_derep_clust90_genes_derep $FA

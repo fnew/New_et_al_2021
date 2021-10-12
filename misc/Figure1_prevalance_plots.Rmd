@@ -1,0 +1,295 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+
+##Making prevalence plots for snps, genes, and species
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(plyr)
+```
+
+
+```{r}
+##Import data
+taxa.ab <- read.table("/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK240_species_abundance_gmeanNormalized_filt10_v2.txt", sep="\t", header=T)
+
+taxa1 <- read.table("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_results_v2.csv", sep=",", header=T)
+names(taxa1) <- c("species","comp1")
+taxa2 <- read.table("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_comp2_results_v2.csv", sep=",", header=T)
+names(taxa2) <- c("species","comp2")
+
+taxa.all <- merge(taxa1, taxa2, by="species", all=T)
+
+taxa.all$comp[taxa.all$comp1 !=0 & taxa.all$comp2==0] <- 1
+taxa.all$comp[taxa.all$comp1 ==0 & taxa.all$comp2!=0] <- 2
+taxa.all$comp[taxa.all$comp1 !=0 & taxa.all$comp2!=0] <- 3
+taxa.all$comp[taxa.all$comp1 ==0 & taxa.all$comp2==0] <- 0
+
+table(taxa.all$comp)
+#    0    1    2    3 
+#   171  68   350   66
+
+taxa.group <- taxa.all[,-c(2,3)]
+
+nonzero <- function(x) sum(x != 0)
+taxa.pa <- numcolwise(nonzero)(taxa.ab)
+taxa.pa2 <- as.data.frame(t(taxa.pa))
+taxa.pa2$species <- row.names(taxa.pa2)
+taxa.pa2$prop <- taxa.pa2$V1 / 240
+
+#Add cca test group into the presence/absence data
+datsp <- merge(taxa.pa2, taxa.group, by="species", all=T)
+table(datsp$comp)
+#   0    1    2    3  #These are the old numbers
+#5587  149  172    3 
+
+#    0    1    2    3 #New numbers
+#   171  68   350   66
+datsp.ab <- merge(datsp, mean.abund2, by.x="species", by.y=0, all.x=T)
+datsp1 <- datsp.ab[which(datsp.ab$comp=='1'),]
+datsp2 <- datsp.ab[which(datsp.ab$comp=='2'),]
+datsp3 <- datsp.ab[which(datsp.ab$comp=='3'),]
+
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/species/plots/species_prevalence.svg", height=5, width=20)
+ggplot(datsp, aes(x=reorder(species,-prop), y=prop, fill=factor(comp), alpha=factor(comp))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("Species selected by CCA Component 1") +
+  ylab("Presence out of 240") +
+  scale_alpha_manual(values=c("0"=0.3, "1"=1, "2"=1, "3"=1), guide="none") +
+  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9", "#009E73"), 
+                       name="sCCA Component",
+                       breaks=c("0","1","2","3"),
+                       labels=c("Background (5587)", "Component 1 (149)", "Component 2 (172)", "Both Components (3)"))
+dev.off()
+
+datsp2 <- datsp[datsp$comp != 0,]
+
+
+display.brewer.pal(n=10, name='PRGn')
+brewer.pal(n=10, name="PRGn")
+ #[1] "#40004B" "#762A83" "#9970AB" "#C2A5CF" "#E7D4E8" "#D9F0D3" "#A6DBA0" "#5AAE61" "#1B7837" "#00441B"
+#Purple -------> Green
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/species_prevalence_subset_v2.pdf", height=5, width=20)
+ggplot(datsp2, aes(x=reorder(species,-prop), y=prop, fill=factor(comp), alpha=factor(comp))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("Species selected by CCA Component 1") +
+  ylab("Presence out of 240") +
+  scale_alpha_manual(values=c( "1"=1, "2"=1, "3"=1), guide="none") +
+  scale_fill_manual(values=c( "#00441B", "#5AAE61", "#F2AF29"), 
+                       name="sCCA Component",
+                       breaks=c("1","2","3"),
+                       labels=c( "Component 1 (149)", "Component 2 (172)", "Both Components (3)"))
+dev.off()
+```
+
+```{r}
+##Create the prevalence plot for the microbial genes
+abun.10 <- read.table("/workdir/users/fnn3/twins_uk/genes/abundance/BGI240_KO_only_geneFamily_table_filt10.txt", header=T, sep="\t")
+abun.comp1 <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_results_mod.csv", sep="\t", header=T)
+names(abun.comp1) <- c("KO","beta_comp1")
+abun.comp2 <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_comp2_results.csv", sep="\t", header=T)
+names(abun.comp2) <- c("KO","beta_comp2")
+
+abun.all <- merge(abun.comp1, abun.comp2, by="KO", all=T)
+
+abun.all$comp[abun.all$beta_comp1 !=0 & abun.all$beta_comp2==0] <- 1
+abun.all$comp[abun.all$beta_comp2 !=0 & abun.all$beta_comp1==0] <- 2
+abun.all$comp[abun.all$beta_comp1==0 & abun.all$beta_comp2==0] <- 0
+table(abun.all$comp)
+#  0     1     2 
+#12474   168   171 
+abun.group <- abun.all[,-c(2,3)]
+
+nonzero <- function(x) sum(x != 0)
+abun.pa <- numcolwise(nonzero)(abun.10)
+abun.pa2 <- as.data.frame(t(abun.pa))
+abun.pa2$KO <- row.names(abun.pa2)
+abun.pa2$KO <- gsub('\\.',',', abun.pa2$KO)
+abun.pa2$prop <- abun.pa2$V1 / 240
+
+dat <- merge(abun.pa2, abun.group, by="KO", all=T)
+table(dat$comp)
+
+#    0     1     2 
+# 12474   168   171 
+svg("/workdir/users/fnn3/twins_uk/scca/gene_results/plots/genes_prevalence.svg", height=5, width=20)
+ggplot(dat, aes(x=reorder(KO,-prop), y=prop, fill=factor(comp), alpha=factor(comp))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("Genes selected by CCA Component 1") +
+  ylab("Presence out of 240") +
+  scale_alpha_manual(values=c("0"=0.3, "1"=1, "2"=1), guide="none") +
+  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"), 
+                       name="sCCA Component",
+                       breaks=c("0","1","2"),
+                       labels=c("Background (12,474)", "Component 1 (168)", "Component 2 (171)"))
+dev.off()
+
+
+dat2 <- dat[dat$comp!=0,]
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/genes_prevalence_subset.pdf", height=5, width=20)
+ggplot(dat2, aes(x=reorder(KO,-prop), y=prop, fill=factor(comp), alpha=factor(comp))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("Genes selected by CCA Component 1") +
+  ylab("Presence out of 240") +
+  scale_alpha_manual(values=c( "1"=1, "2"=1), guide="none") +
+  scale_fill_manual(values=c( "#40004B", "#9970AB"), 
+                       name="sCCA Component",
+                       breaks=c("1","2"),
+                       labels=c( "Component 1 (168)", "Component 2 (171)"))
+dev.off()
+```
+
+
+
+
+
+```{r}
+#import SNP data
+all.freq <- read.table("/workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_maf10_nomissing_hwe001_ld80_recode_allele_freq.afreq", sep="\t", header=T)
+snp.g1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/nonzero_snp_list.txt", header=T)
+snp.g2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_alpha_comp2_nonzero_results_rsID.csv", header=T)
+
+snp.s1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_results_nonzero_rsID_v2.txt", header=T)
+snp.s2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_comp2_results_nonzero_rsID_v2.txt", header=T)
+
+snp.g1$cca_genes_comp1 <- 1
+snp.g2$cca_genes_comp2 <- 1
+snp.s1$cca_species_comp1 <- 1
+snp.s2$cca_species_comp2 <- 1
+
+snp.g1g2 <- merge(snp.g1, snp.g2, by="SNP", all=T)
+snp.g1g2s1 <- merge(snp.g1g2, snp.s1, by="SNP", all=T)
+snp.all <- merge(snp.g1g2s1, snp.s2, by="SNP", all=T)
+
+snp.all$rowsum <- rowSums(snp.all[,-1], na.rm=T)
+check <- snp.all[(snp.all$rowsum == 2),]
+
+table(check$cca_genes_comp1, check$cca_species_comp1) #82
+table(check$cca_genes_comp1, check$cca_species_comp2) #0 
+table(check$cca_genes_comp2, check$cca_species_comp1) #1
+table(check$cca_genes_comp2, check$cca_species_comp2) #16
+
+
+snp.all$group[snp.all$cca_genes_comp1==1 & is.na(snp.all$cca_genes_comp2) & is.na(snp.all$cca_species_comp1) & is.na(snp.all$cca_species_comp2)] <- 1
+snp.all$group[snp.all$cca_genes_comp2==1 & is.na(snp.all$cca_genes_comp1) & is.na(snp.all$cca_species_comp1) & is.na(snp.all$cca_species_comp2)] <- 2
+snp.all$group[snp.all$cca_species_comp1==1 & is.na(snp.all$cca_genes_comp2) & is.na(snp.all$cca_genes_comp1) & is.na(snp.all$cca_species_comp2)] <- 3
+snp.all$group[snp.all$cca_species_comp2==1 & is.na(snp.all$cca_genes_comp1) & is.na(snp.all$cca_species_comp1) & is.na(snp.all$cca_genes_comp2)] <- 4
+snp.all$group[snp.all$cca_genes_comp1==1 & snp.all$cca_species_comp1==1 & is.na(snp.all$cca_species_comp2) & is.na(snp.all$cca_genes_comp2)] <- 5
+snp.all$group[snp.all$cca_genes_comp2==1 & snp.all$cca_species_comp1==1 & is.na(snp.all$cca_species_comp2) & is.na(snp.all$cca_genes_comp1)] <- 6
+snp.all$group[snp.all$cca_genes_comp2==1 & snp.all$cca_species_comp2==1 & is.na(snp.all$cca_species_comp1) & is.na(snp.all$cca_genes_comp1)] <- 7
+
+
+snp.all2 <- snp.all[,-c(2:6)]
+
+dat <- merge(snp.all2, all.freq, by.x="SNP", by.y="ID", all=T)
+dat[is.na(dat)] <- 0
+dat2 <- dat[dat$group!=0,]
+
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/snp_selected_by_cca_all_freq.svg", height=5, width=20)
+ggplot(dat2, aes(x=reorder(SNP,-ALT_FREQS), y=ALT_FREQS, fill=factor(group), alpha=factor(group))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("All SNPs selected by SCCA") +
+  ylab("Presence out of 240") +
+  scale_alpha_manual(values=c( "1"=1, "2"=1, "3"=1, "4"=1, "5"=1,"6"=1, "7"=1), guide="none") +
+  scale_fill_manual(values=c( "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 
+                       name="sCCA Component",
+                       breaks=c("1","2","3","4","5","6","7"),
+                       labels=c( "Genes Component 1", "Genes Component 2", "Species Component 1", "Species Component 2", "Genes Component 1 & Species Component 1", "Genes Component 2 & Species Component 1", "Genes Component 2 & Species Component 2"))
+dev.off()
+
+
+#### Test specific SNP plots\
+
+### Gene tests
+snp.g1$cca_genes_comp1 <- 1
+snp.g2$cca_genes_comp2 <- 1
+snp.s1$cca_species_comp1 <- 1
+snp.s2$cca_species_comp2 <- 1
+
+snp.g1g2 <- merge(snp.g1, snp.g2, by="SNP", all=T)
+snp.g1g2$group[snp.g1g2$cca_genes_comp1==1 & is.na(snp.g1g2$cca_genes_comp2) ] <- 1
+snp.g1g2$group[snp.g1g2$cca_genes_comp2==1 & is.na(snp.g1g2$cca_genes_comp1) ] <- 2
+
+datgenes <- merge(snp.g1g2, all.freq, by.x="SNP", by.y="ID", all=T)
+datgenes[is.na(datgenes)] <- 0
+datgenes2 <- datgenes[datgenes$group!=0,]
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/snp_selected_by_cca_genes_freq.pdf", height=5, width=20)
+ggplot(datgenes2, aes(x=reorder(SNP,-ALT_FREQS), y=ALT_FREQS, fill=factor(group), alpha=factor(group))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("SNPs selected by SCCA") +
+  ylab("Presence") +
+  scale_alpha_manual(values=c( "1"=1, "2"=1), guide="none") +
+  scale_fill_manual(values=c( "#40004B", "#9970AB"), 
+                       name="sCCA Component",
+                       breaks=c("1","2"),
+                       labels=c( "Genes Component 1", "Genes Component 2"))
+dev.off()
+
+
+### Species tests
+
+
+snp.s1$cca_species_comp1 <- 1
+snp.s2$cca_species_comp2 <- 1
+
+snp.s1s2 <- merge(snp.s1, snp.s2, by="SNP", all=T)
+snp.s1s2$group[snp.s1s2$cca_species_comp1==1 & is.na(snp.s1s2$cca_species_comp2) ] <- 1
+snp.s1s2$group[snp.s1s2$cca_species_comp2==1 & is.na(snp.s1s2$cca_species_comp1) ] <- 2
+
+datspec <- merge(snp.s1s2, all.freq, by.x="SNP", by.y="ID", all=T)
+datspec[is.na(datspec)] <- 0
+datspec2 <- datspec[datspec$group!=0,]
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/snp_selected_by_cca_species_freq_v2.pdf", height=5, width=20)
+ggplot(datspec2, aes(x=reorder(SNP,-ALT_FREQS), y=ALT_FREQS, fill=factor(group), alpha=factor(group))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x= element_blank()) +
+  xlab("SNPs selected by SCCA") +
+  ylab("Presence") +
+  scale_alpha_manual(values=c( "1"=1, "2"=1), guide="none") +
+  scale_fill_manual(values=c( "#00441B", "#5AAE61"), 
+                       name="sCCA Component",
+                       breaks=c("1","2"),
+                       labels=c( "Species Component 1", "Species Component 2"))
+dev.off()
+
+
+##Plot snp overlap
+group <- c("Gene1-Species1","Gene2-Species2","Gene2-Species1","Species1-Species2-Gene2")
+amount <- c(82, 16,1,1)
+overlap <- as.data.frame(cbind(group, amount))
+
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/scca_selected_snps_overlap.svg")
+ggplot(overlap, aes(group, as.numeric(amount))) +
+  geom_bar(stat="identity") +
+  theme_classic() +
+  xlab("sCCA Test Overlap") +
+  ylab("Number of SNPs overlapping")
+dev.off()
+```

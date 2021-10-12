@@ -1,0 +1,16 @@
+#$ -S /bin/bash
+#$ -N transpose
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/transpose.err
+#$ -wd /workdir/users/fnn3/twins_uk/gene_abundance
+#$ -q long.q@cbsubrito2
+
+
+WRK=/workdir/users/fnn3
+
+IN=$WRK/twins_uk/gene_abundance/gene_abundance_table.csv
+OUT=$WRK/twins_uk/gene_abundance/gene_abundance_table_wide.csv
+
+PROG=$WRK/twins_uk/gene_abundance/transpose_counts.py
+
+python $PROG -i $IN -o $OUT

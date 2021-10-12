@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N extractFA
+#$ -V
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/extract_fasta_unknown.out
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/extract_fasta_unknown.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/annotation
+#$ -l h_vmem=5G
+#$ -q long.q@cbsubrito2
+#$ -pe parenv 1
+
+#Script to extract fasta sequences from the nucleotide file
+#These are the genes that still do not have an annotated function
+#I want to cluster them again at a lower threshold to create new gene families
+#I'll name them according to their clsuter 
+
+WRK=/workdir/users/fnn3
+
+
+FETCH=$WRK/scripts/general_use/fastafetcher2.py
+
+WANT=$WRK/twins_uk/genes/annotation/BGI_twins_gene_catalog_noKO_unknown_genes.txt
+FA=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_genes.fa
+OUT=$WRK/twins_uk/genes/annotation/BGI_twins_genesAA_noKO_unknownFxn.faa
+
+FAA=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_proteins.faa
+#WANT=$WRK/twins_uk/genes/abundance/twinsUK_aligned_genes.txt
+#OUT=$WRK/twins_uk/genes/abundance/BGI_twins_derep_clust90_aligned_genes.fa
+
+python2 $FETCH -f $FAA -k $WANT -o $OUT -m exact

@@ -1,0 +1,270 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+##Processing the species abundances from Bracken for the TwinsUK 250. First read in the combined table and separate out the counts. Then divide by the geometric mean? Only?
+```{r}
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(tidyverse)
+library(sctransform)
+library(ggplot2)
+library(COUNT)
+```
+
+
+
+```{r}
+species <- read.delim2("/workdir/users/fnn3/twins_uk/taxa/bracken/combined_species_bracken.txt", header=T, sep="\t")
+sab <- cbind(species$name, select(species, contains("num"))) #7,160 species
+  sab <-   rename(sab, name = `species$name`)
+
+sab2 <- sab[,-c(1)]
+
+sab3 <- sab[rowMeans(sab[,-c(1)]!=0)>0.10,] #5,901 species left
+
+```
+
+##First step, divide all counts by the geometric mean to normalize for library size and compositionality
+```{r}
+sab$name <- gsub('\\s+', "_", sab$name)
+tsab <- t(sab)
+
+tsab <- setNames(data.frame(t(sab[,-1])), sab[,1])
+tsab.m <- as.matrix(tsab)
+
+#Get the geometric mean and add 1 to every value
+gmean <-as.data.frame( sctransform:::row_gmean(tsab.m, eps=1))
+names(gmean) <-c("gmean")
+
+tsab2 <- merge(tsab, gmean, by=0 )
+tsab2$Row.names <- gsub(".bracken_num","", tsab2$Row.names)
+rownames(tsab2) <- tsab2[,1]
+tsab2[,1] <- NULL
+
+#Now to divide each value in each row by its own geometric mean
+tsab.norm <- tsab2/tsab2$gmean
+
+tsab.norm <- data.frame(BGI_ID=rownames(tsab.norm), tsab.norm)
+tsab.norm$gmean <- NULL
+write.table(tsab.norm, "/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK_species_abundance_gmeanNormalized.txt", sep="\t", quote = F)
+
+#Remove rare data, 10%
+
+tsab.norm2 <- tsab.norm[sapply(tsab.norm, function(x) mean(x==0) <= 0.9)] #5912 left
+write.table(tsab.norm2, "/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK_species_abundance_gmeanNormalized_filt10.txt", sep="\t", quote = F, row.names=F)
+
+
+#Now prepare them for CCA - remove the ten missing twins
+withsnp <- read.table("/workdir/users/fnn3/twins_uk/BGI_SNP/BGI_twins_with_SNPs.txt", sep="\t", header=T)
+tsab.norm240 <- tsab.norm2[tsab.norm2$BGI_ID %in% withsnp$bgi_id,]
+
+write.table(tsab.norm240, "/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK240_species_abundance_gmeanNormalized_filt10.txt", sep="\t", quote = F, row.names=F)
+
+```
+###Plotting the species abundances to check for Tweedie. Normalized data
+```{r}
+msab <- apply(tsab.norm[,-1], 2, function(col)
+  c("mean" = mean(col) , "pofzeros" = sum(col==0)/length(col))
+  )   #mean abundance and proportion of zeros for each species aka 'col'
+
+mean.ab <- msab[1,]
+pofzeros.ab <- msab[2,]
+std.abund2 <- apply(tsab.norm[,-c(1)], 2, function(vecc) sqrt(sum(vecc^2)))
+log.var2 <- log(std.abund2^2)
+
+
+plot(mean.ab, pofzeros.ab, main="Mean species abundance vs proportion of zeros") #looks weird...
+plot(exp(-mean.ab^0.5/1.6), pofzeros.ab, main = "Tweedie expected proportion of zeros vs observed proportion of zero", ylim=c(0,1)) #looks ok?
+
+pofnonzero <- 1 - pofzeros.ab
+log.mean.abund2 <- log(mean.ab)
+
+our.glm <- glm(pofnonzero ~ log.mean.abund2, family = binomial(link=cloglog), weights = rep( 250, 7160))
+
+int <- our.glm$coefficients[1]
+slope <- our.glm$coefficients[2]
+optimal.transformation.of.mean <- exp(-mean.ab^slope/exp(-int)) #theoretically optimal: see email
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/tweedie_transformation_mean_plot.pdf", height=5, width=10)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.ab , 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=0.5, alpha=.5) + 
+  xlab("Expected proportion of zeros") + ylab("Observed proportion of zeros") +
+  scale_color_continuous(name="log(variance)")
+dev.off()
+
+
+#qplot(optimal.transformation.of.mean, pofzeros.abund2)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.ab, 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=.5, alpha=.5)
+
+qplot(log.mean.abund2, log.var2)+geom_abline(slope = 1, intercept = 0) + xlab("log mean") + ylab("log variance")
+summary(lm(log.var2~log.mean.abund2))$coefficients[2,1]
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/twins_uk_logmean_logvar.pdf", height=6, width=10)
+ggplot(data.frame('x'=log.mean.abund2, 'y'=log.var2, 'col'=pofzeros.ab), aes(x=x, y=y, colour=col))+
+  geom_point( alpha=.5) +
+  ylab("log(var)") + xlab("log(mean)") +
+  scale_color_continuous(name="Proportion of zeros") +
+  geom_abline(intercept=0, slope=1)
+dev.off()
+
+plot(log.mean.abund2, log.var2, pch=20, xlim=c(0,8.5), ylim=c(0,34))#, pch=20, cex=.01)
+abline(a=6, b=3.2, col='blue') # from zeros
+plot(log.mean.abund2, log.var2, pch=20)#, pch=20, cex=.01)
+abline(a=6, b=3.2, col='blue') # made up
+
+
+
+
+
+
+# using mean and variance (tweedie)
+Y.abun2 <- tsab.norm[,-1]
+std.abund2 <- apply(Y.abun2, 2, function(vecc) sqrt(sum(vecc^2)))
+log.var2 <- log(std.abund2^2)
+
+meanvar_coefs <- summary(lm(log.var2~log.mean.abund2))$coefficients[,1] # 8.834982 1.663457 
+meanvar_coefs #7.359187        1.538918 
+
+int <- 7.359187 
+slope <- 1.538918 
+optimal.transformation.of.mean <- exp(-mean.ab^slope/exp(-int)) #theoretically optimal: see email
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/tweedie_transformation_mean_plot.pdf", height=5, width=10)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.ab , 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=0.5, alpha=.5) + 
+  xlab("Expected proportion of zeros") + ylab("Observed proportion of zeros") +
+  scale_color_continuous(name="log(variance)")
+dev.off()
+
+```
+
+
+
+
+##Plotting the species abundances to check for Tweedie. These are all on unnormalized data
+```{r}
+#With no normalization, just raw counts
+msab <- apply(sab2, 1, function(row)
+  c("mean" = mean(row) , "pofzeros" = sum(row==0)/length(row))
+  )   #mean abundance and proportion of zeros for each species
+
+mean.ab <- msab[1,]
+pofzeros.ab <- msab[2,]
+std.abund2 <- apply(sab2, 1, function(vecc) sqrt(sum(vecc^2)))
+log.var2 <- log(std.abund2^2)
+
+
+plot(mean.ab, pofzeros.ab, main="Mean species abundance vs proportion of zeros") #looks ok...
+plot(exp(-mean.ab^0.5/9), pofzeros.ab, main = "Tweedie expected proportion of zeros vs observed proportion of zero") #does not look right
+
+pofnonzero <- 1 - pofzeros.ab
+log.mean.abund2 <- log(mean.ab)
+our.glm <- glm(pofnonzero ~ log.mean.abund2, family = binomial(link=cloglog), weights = rep(250, nrow(sab2)))
+int <- our.glm$coefficients[1]
+slope <- our.glm$coefficients[2]
+optimal.transformation.of.mean <- exp(-mean.ab^slope/exp(-int)) #theoretically optimal: see email
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/tweedie_transformation_mean_plot.pdf", height=5, width=10)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.ab , 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=0.5, alpha=.5) + 
+  xlab("Expected proportion of zeros") + ylab("Observed proportion of zeros") +
+  scale_color_continuous(name="log(variance)")
+dev.off()
+
+
+#qplot(optimal.transformation.of.mean, pofzeros.abund2)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.ab, 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=.5, alpha=.5)
+
+qplot(log.mean.abund2, log.var2)+geom_abline(slope = 1, intercept = 0) + xlab("log mean") + ylab("log variance")
+summary(lm(log.var2~log.mean.abund2))$coefficients[2,1]
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/twins_uk_logmean_logvar.pdf", height=6, width=10)
+ggplot(data.frame('x'=log.mean.abund2, 'y'=log.var2, 'col'=pofzeros.ab), aes(x=x, y=y, colour=col))+
+  geom_point( alpha=.5) +
+  ylab("log(var)") + xlab("log(mean)") +
+  scale_color_continuous(name="Proportion of zeros")
+dev.off()
+
+plot(log.mean.abund2, log.var2, pch=20, xlim=c(0,8.5), ylim=c(0,34))#, pch=20, cex=.01)
+abline(a=6, b=3.2, col='blue') # from zeros
+plot(log.mean.abund2, log.var2, pch=20)#, pch=20, cex=.01)
+abline(a=6, b=3.2, col='blue') # made up
+```
+
+
+
+##Plotting the species abundances to check for tweedie. normalized data, not filtered
+```{r}
+sabund <- read.table("/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK_species_abundance_gmeanNormalized.txt", sep="\t")
+sabund2 <- sabund[,-1] #Remove character identifier, BGI_IDs
+sabund2[is.na(sabund2)] <- 0  #replace NAs with 0
+
+#### get transformations and summaries ####
+m <- apply(sabund2, 2, function(col) 
+   c("mean" = mean(col), "pofzeros" = sum(col==0)/length(col))
+  ) #figure out mean abundance and proportion of zeroes of each gene family 
+
+mean.sabund <- m[1,]
+pofzeros.sabund <- m[2,]
+
+# using sparsity and mean (tweedie)
+spofnonzero <- 1 - pofzeros.sabund
+log.mean.sabund <- log(mean.sabund)
+our.glm <- glm(spofnonzero ~ log.mean.sabund, family = binomial(link=cloglog), weights = rep(250, ncol(sabund2)))
+int <- our.glm$coefficients[1]
+slope <- our.glm$coefficients[2]
+optimal.transformation.of.mean <- exp(-mean.sabund^slope/exp(-int)) #theoretically optimal: see email
+
+# using mean and variance (tweedie)
+Y.sabund <- sabund2
+std.sabund <- apply(Y.sabund, 2, function(vecc) sqrt(sum(vecc^2)))
+log.svar <- log(std.sabund^2)
+
+meanvar_scoefs <- summary(lm(log.svar~log.mean.sabund))$coefficients[,1] # int=7.36, slope= 1.54
+meanvar_scoefs
+
+# using mean and variance (negative binomial)
+# note, i'd rather do this (and all others) via coordinate descent on \mu and the model parameters.. actually fitting the likelihood
+#Xregr <- kronecker(diag(rep(1, ncol(abund))), rep(1, nrow(abund)))
+#Yregr <- as.vector(abund)
+
+nb_smeanvar_coefs <- c(log(1), summary(lm(log.svar~0+log.mean.sabund))$coefficients[,1])
+nb_smeanvar_coefs # 0, 2.12599
+
+#### Make plots ####
+
+pdf("/workdir/users/fnn3/twins_uk/scca/species/plots/tweedie_transformation_mean_plot_species.pdf", height=5, width=10)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.sabund, 'col'=log.svar), aes(x=x, y=y, colour=col))+
+  geom_point(size=0.5, alpha=.5) + 
+  xlab("Expected proportion of zeros") + ylab("Observed proportion of zeros") +
+  scale_color_continuous(name="log(variance)") +
+  theme_classic()
+dev.off()
+
+
+#pdf("/workdir/users/fnn3/twins_uk/tweedie_mean_vs_var_plot.pdf", height=5, width=10)
+ggplot(data.frame('x'=log.mean.sabund, 'y'=log.svar, 'col'=pofzeros.sabund), aes(x=x, y=y, colour=col))+
+  geom_point(size=.3, alpha=.5) + 
+  scale_color_continuous(name="Proportion of zeros") +
+  xlab("log(mean abundance)") + ylab("log(variance)") +
+  geom_abline(intercept=8, slope=1.75, col='magenta', size=1, linetype='dotted') +# made up
+  theme_classic()
+  #dev.off()
+
+pdf("/workdir/users/fnn3/twins_uk/scca/species/plots/tweedie_mean_vs_var_plot_w_lines_species.pdf", height=5, width=10)
+ggplot(data.frame('x'=log.mean.sabund, 'y'=log.svar, 'col'=pofzeros.sabund), aes(x=x, y=y, colour=col))+
+  geom_point(size=.3, alpha=.5) + 
+  scale_color_continuous(name="Proportion of zeros") +
+  xlab("log(mean abundance)") + ylab("log(variance)") +
+  geom_abline(intercept=0, slope=1, show.legend=T) + # poisson
+  geom_abline(intercept=meanvar_scoefs[1], slope=1.80, col='red', show.legend=T) +  # from tweedie mean and var
+  geom_abline(intercept=nb_smeanvar_coefs[1], slope=nb_smeanvar_coefs[2], col='blue', show.legend=T) +  # from NB1 mean and var
+  theme_classic() 
+dev.off()
+
+
+```

@@ -1,9 +1,9 @@
 #$ -S /bin/bash
 #$ -N idxstats
 #$ -V
-#$ -t 1-32
-#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/idxstats.err
-#$ -wd /workdir/users/fnn3/twins_uk
+#$ -t 1-87
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/idxstats.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/align
 #$ -l h_vmem=5G
 #$ -q short.q@cbsubrito2
 
@@ -11,23 +11,26 @@
 
 #Set directories
 WRK=/workdir/users/fnn3
-BAMOUT=$WRK/twins_uk/bam/filtered_bam
-OUT=$BAMOUT/idxstats
+BAMOUT=$WRK/twins_uk/genes/align/bwa_out/bam
+OUT=$WRK/twins_uk/genes/align/bwa_out/idxstats
 	if [ ! -d $OUT ]; then mkdir -p $OUT; fi
 
 
 #Define design file
-DESIGN_FILE=$WRK/design_files/trunc_twins.csv
-	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
-	IFS=',' read -ra ARRAY <<< "$DESIGN"
-
-	NAME=${ARRAY[0]}
-	BATCH=${ARRAY[1]}
+#DESIGN_FILE=$WRK/design_files/twins_names.csv
+#	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+#	IFS=',' read -ra ARRAY <<< "$DESIGN"
+#	NAME=${ARRAY[1]}
+#	BATCH=${ARRAY[0]}
 	
+#LIST=$WRK/design_files/twins_names.txt
+LIST=$WRK/twins_uk/genes/abundance/unfiltered/logs/unfinished_twins_rpkm.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
 
-BAM=$BAMOUT/${NAME}_filtered90_primary
+BAM=$BAMOUT/${NAME}_filtered90_primary.sorted.bam
 
 #Path to SAMtools
-export PATH=/programs/samtools-0.1.19
+#export PATH=/programs/samtools-0.1.19
 
-samtools idxstats ${BAM}.sorted.bam > $OUT/${NAME}_filtered90_primary.idxstats.txt
+samtools idxstats ${BAM} > $OUT/${NAME}_filtered90_primary.idxstats.txt

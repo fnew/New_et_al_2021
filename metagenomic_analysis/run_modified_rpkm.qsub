@@ -1,0 +1,40 @@
+#$ -S /bin/bash
+#$ -N RPKM
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/twins_rpkm.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes
+#$ -l h_vmem=100G
+#$ -q long.q@cbsubrito2
+#$ -t 2-87
+
+
+# Script to calculate RPKM on the twins gene alignments
+
+#Set paths and directories
+WRK=/workdir/users/fnn3
+OUTDIR=$WRK/twins_uk/genes/abundance/unfiltered
+LOG=$OUTDIR/logs
+	if [ ! -d $LOG ]; then mkdir -p $LOG; fi
+
+#Set task array
+#LIST=$WRK/design_files/twins_names.txt
+LIST=$WRK/twins_uk/genes/abundance/unfiltered/logs/unfinished_twins_rpkm.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+
+#Set paths for all inputs
+SCRIPT=/workdir/scripts/analyzing_alignments/rpkm_calculate_aitchison.py
+STAT=$WRK/twins_uk/genes/align/bwa_out/idxstats/${NAME}_filtered90_primary.idxstats.txt
+DEPTH=$WRK/twins_uk/genes/align/bwa_out/depth/${NAME}_filtered90_primary.depth.txt
+LOGFILE=$LOG/${NAME}.log
+OUT=$OUTDIR/${NAME}_abundance.txt
+
+
+#Need to use this conda env for python2
+eval "$(/home/fnn3/miniconda3/bin/conda shell.bash hook)"
+conda activate python2_env
+
+python $SCRIPT -s $STAT -d $DEPTH -g $LOGFILE -o $OUT
+
+conda deactivate

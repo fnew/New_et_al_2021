@@ -1,0 +1,26 @@
+#$ -S /bin/bash
+#$ -N alnBWA
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/aln_genes.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/align
+#$ -l h_vmem=20G
+#$ -pe parenv 4
+#$ -q long.q@cbsubrito2
+#$ -t 201-250
+
+# Script to align metagenomic reads to custom gene catalog
+
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+FQ1=/workdir/data/twins/3-derep/${NAME}_1.fastq
+FQ2=/workdir/data/twins/3-derep/${NAME}_2.fastq
+REF=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_genes
+
+
+OUT=$WRK/twins_uk/genes/align/bwa_out
+
+bwa mem -a -t 4 $REF $FQ1 $FQ2  >  $OUT/${NAME}.sam 

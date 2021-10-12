@@ -1,0 +1,18 @@
+#$ -S /bin/bash
+#$ -N cdHITunknown
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/cdhit_bgi_unknown.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/annotation
+#$ -l h_vmem=50G
+#$ -pe parenv 8
+#$ -q long.q@cbsubrito2
+
+#Cluster the genes that have no KO annotation to create new pseudo-gene families based on sequence similarity (their counts will be aggregated along with the KO groups)
+
+WRK=/workdir/users/fnn3
+
+FAA=$WRK/twins_uk/genes/annotation/BGI_twins_genesAA_noKO_unknownFxn.faa
+OUT=$WRK/twins_uk/genes/annotation/BGI_twins_genes_noKO_clust60.faa
+
+cd $WRK/twins_uk/genes/annotation
+/programs/cd-hit-4.8.1/cd-hit -i $FAA -o $OUT -c 0.60 -n 4 -M 50000 -T 8 -d 0

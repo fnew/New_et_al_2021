@@ -1,0 +1,37 @@
+#$ -S /bin/bash
+#$ -N cdHITBGI
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/cdhit_prodigal_bgi.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/cdhit
+#$ -l h_vmem=50G
+#$ -pe parenv 8
+#$ -q long.q@cbsubrito2
+
+#Script to align metagenomic reads to the peptide gene catalog
+#Diamonid
+# I need to run each file separately.. for simplicity I will run all forward then all reverse files...
+
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+FQ1=/workdir/data/twins/3-derep/${NAME}_1.fastq
+FQ2=/workdir/data/twins/3-derep/${NAME}_2.fastq
+
+REF=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_protein.dmnd
+
+OUT=$WRK/twins_uk/genes/align/$NAME
+  if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+#Run diamond
+/programs/diamond/diamond blastx \
+	--block-side 40.0 \
+	--index-chunks 1 \
+	--threads 16 \
+	--id 90 \
+	--unal 0 \
+	-d $REF \
+	-q  \
+	-o $OUT

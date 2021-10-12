@@ -1,0 +1,91 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+
+### Tweedie visualizations for the gene abundances
+```{r}
+library(ggplot2)
+library(COUNT)
+library(RColorBrewer)
+#### read in data ####
+##abund is the data frame of abudundances, directly inputted
+abund <- read.table('/workdir/users/fnn3/twins_uk/genes/abundance/BGI_KO_only_geneFamily_table.txt', sep='\t', header=T)
+
+abund2 <- abund[,-1]
+abund2[is.na(abund2)] <- 0  #replace NAs with 0
+
+#### get transformations and summaries ####
+m <- apply(abund2, 2, function(col) 
+   c("mean" = mean(col), "pofzeros" = sum(col==0)/length(col))
+  ) #figure out mean abundance and proportion of zeroes of each gene family 
+
+mean.abund2 <- m[1,]
+pofzeros.abund2 <- m[2,]
+
+# using sparsity and mean (tweedie)
+pofnonzero <- 1 - pofzeros.abund2
+log.mean.abund2 <- log(mean.abund2)
+our.glm <- glm(pofnonzero ~ log.mean.abund2, family = binomial(link=cloglog), weights = rep(250, ncol(abund2)))
+int <- our.glm$coefficients[1]
+slope <- our.glm$coefficients[2]
+optimal.transformation.of.mean <- exp(-mean.abund2^slope/exp(-int)) #theoretically optimal: see email
+
+# using mean and variance (tweedie)
+Y.abun2 <- abund2
+std.abund2 <- apply(Y.abun2, 2, function(vecc) sqrt(sum(vecc^2)))
+log.var2 <- log(std.abund2^2)
+
+meanvar_coefs <- summary(lm(log.var2~log.mean.abund2))$coefficients[,1] # 8.834982 1.663457 
+meanvar_coefs
+
+nb_meanvar_coefs <- c(log(1), summary(lm(log.var2~0+log.mean.abund2))$coefficients[,1]) # 0, 3.1
+nb_meanvar_coefs
+
+#### Make plots ####
+display.brewer.pal(n=10, name='PiYG')
+display.brewer.pal(n=10, name='PRGn')
+brewer.pal(n=10, name="PRGn")
+ #[1] "#40004B" "#762A83" "#9970AB" "#C2A5CF" "#E7D4E8" "#D9F0D3" "#A6DBA0" "#5AAE61" "#1B7837" "#00441B"
+#Purple -------> Green
+
+brewer.pal(n=10, name="PiYG")
+# [1] "#8E0152" "#C51B7D" "#DE77AE" "#F1B6DA" "#FDE0EF" "#E6F5D0" "#B8E186" "#7FBC41" "#4D9221" "#276419"
+# Magenta ---------> Greem
+```
+
+
+```{r}
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/tweedie_transformation_mean_plot_genes.pdf", height=5, width=10)
+ggplot(data.frame('x'=optimal.transformation.of.mean, 'y'=pofzeros.abund2, 'col'=log.var2), aes(x=x, y=y, colour=col))+
+  geom_point(size=0.5, alpha=.5) + 
+  xlab("Expected proportion of zeros") + ylab("Observed proportion of zeros") +
+  scale_color_continuous(name="log(variance)",  low="#40004B", high="#C2A5CF") +
+  theme_classic()
+dev.off()
+
+#pdf("/workdir/users/fnn3/twins_uk/tweedie_mean_vs_var_plot.pdf", height=5, width=10)
+ggplot(data.frame('x'=log.mean.abund2, 'y'=log.var2, 'col'=pofzeros.abund2), aes(x=x, y=y, colour=col))+
+  geom_point(size=.3, alpha=.5) + 
+  scale_color_continuous(name="Proportion of zeros") +
+  xlab("log(mean abundance)") + ylab("log(variance)") +
+  geom_abline(intercept=8, slope=1.75, col='magenta', size=1, linetype='dotted')  # made up
+#dev.off()
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/tweedie_mean_vs_var_plot_w_lines_genes.pdf", height=5, width=10)
+ggplot(data.frame('x'=log.mean.abund2, 'y'=log.var2, 'col'=pofzeros.abund2), aes(x=x, y=y, colour=col))+
+  geom_point(size=.5, alpha=.5) + 
+  scale_color_continuous(name="Proportion of zeros", low="#40004B", high="#C2A5CF") +
+  xlab("log(mean abundance)") + ylab("log(variance)") +
+  geom_abline(intercept=0, slope=1, col='#9B9B9B') + # poisson
+  geom_abline(intercept=meanvar_coefs[1], slope=1.75, col='#23B5D3') +  # from tweedie mean and var
+  geom_abline(intercept=nb_meanvar_coefs[1], slope=nb_meanvar_coefs[2], col='#484848') +  # from NB1 mean and var
+  theme_classic()
+dev.off()
+
+#Honey yellow #F2AF29
+#blue #23B5D3
+
+
+```

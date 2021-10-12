@@ -1,0 +1,91 @@
+---
+title: "Analyzing FUMA results"
+output: pdf_document
+---
+
+#### Analyzing the results from FuMA. 
+### There are snp and gene data from FUMA.
+
+## Start with the importing data
+
+```{r}
+fma.s1 <- read.table("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_job142012_species_comp1_v2/magma.gsa.out", skip=4, header=T)
+fma.s1$pbon <- p.adjust(fma.s1$P, method="bonferroni", n=length(fma.s1$P))
+fma.s1b <- fma.s1[which(fma.s1$pbon < 0.05),]
+
+fma.s2 <- read.table("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_job142013_species_comp2_v2/magma.gsa.out", skip=4, header=T)
+fma.s2$pbon <- p.adjust(fma.s2$P, method="bonferroni", n=length(fma.s2$P))
+fma.s2b <- fma.s2[which(fma.s2$pbon < 0.05),]
+
+fma.g1 <- read.table("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_genesComp1/magma.gsa.csv",skip=4, sep=',', header=T)
+fma.g1$pbon <- p.adjust(fma.g1$P, method="bonferroni", n=length(fma.g1$P))
+fma.g1b <- fma.g1[which(fma.g1$pbon < 0.05),]
+
+fma.g2 <- read.table("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_job131074_genes_comp2/magma.gsa.out",skip=4, header=T)
+fma.g2$pbon <- p.adjust(fma.g2$P, method="bonferroni", n=length(fma.g2$P))
+fma.g2b <- fma.g2[which(fma.g2$pbon < 0.05),]
+```
+
+```{r}
+##Plotting 
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/supp_snp_enrichment_speciesComp1.pdf")
+ggplot(fma.s1b, aes(reorder(FULL_NAME, -pbon), -log10(pbon))) +
+  geom_bar(fill="#00441B",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/supp_snp_enrichment_genesComp1.pdf")
+ggplot(fma.g1b, aes(reorder(FULL_NAME, -pbon), -log10(pbon))) +
+  geom_bar(fill="#40004B",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/supp_snp_enrichment_genesComp2.pdf")
+ggplot(fma.g2b, aes(reorder(FULL_NAME, -pbon), -log10(pbon))) +
+  geom_bar(fill="#9970AB",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+```
+
+
+### Look at gene enrichment data
+```{r}
+fma.gs1 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func64277_species_comp1_v2/GS.txt", quote="")
+fma.gs2 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func64280_species_comp2_v2/GS.txt", quote="")
+fma.gg1 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59284_geneComp1/GS.txt", quote="")
+fma.gg2 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59285_geneComp2/GS.txt", quote="")
+
+##Each file has all gene sets, so check which ones I care about. 
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/species_comp1_gwas_trait_plot_v2.pdf")
+ggplot(fma.gs1[which(fma.gs1$Category=="GWAScatalog"),], aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill="#00441B",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/species_comp2_gwas_trait_plot_v2.pdf")
+ggplot(fma.gs2[which(fma.gs2$Category=="GWAScatalog"),], aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill="#5AAE61",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+```

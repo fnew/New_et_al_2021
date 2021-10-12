@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N prodigal
+#$ -V
+#$ -t 1-28
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/prodigal_contigs.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes
+#$ -l h_vmem=15G
+#$ -pe parenv 1
+#$ -q short.q@cbsubrito2
+
+#This script will predict protein coding regions on the twins data assemblies
+# 
+
+WRK=/workdir/users/fnn3
+#LIST=$WRK/design_files/twins_names.txt
+LIST=$WRK/design_files/unfinished_assemblies.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+
+CONTIG=$WRK/twins_uk/assembly/assemblies/${NAME}_contigs.fasta
+OUT=$WRK/twins_uk/genes/prodigal
+  if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+
+#Run Prodigal. Cheat sheet for command options-> https://github.com/hyattpd/prodigal/wiki/cheat-sheet
+
+/programs/prodigal-2.6.3/prodigal -i $CONTIG -o $OUT/${NAME}.gff -d $OUT/${NAME}_nuc.fa  -f gff -a $OUT/${NAME}_proteins.faa -p meta
+

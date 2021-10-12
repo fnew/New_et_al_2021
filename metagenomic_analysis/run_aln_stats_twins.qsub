@@ -1,0 +1,32 @@
+#$ -S /bin/bash
+#$ -N aln_stats
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/PBS_LOGS/bwa_aln_twins/alignment_stats.err
+#$ -t 1-250
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=5G
+
+
+#This script will calculate basic alignment stats using samtools
+
+#Set directories
+WRK=/workdir/users/fnn3
+OUT=/$WRK/twins_uk/alignments/stats
+
+#Create design file of file names
+DESIGN_FILE=$WRK/design_files/twins_names.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	BATCH=${ARRAY[0]}
+	SAMPLE=${ARRAY[1]}
+
+	NAME=${SAMPLE}
+
+
+BAM=$WRK/twins_uk/bam/${NAME}.sorted.bam
+
+#Provide path to samtools
+export PATH=/programs/samtools-0.1.19
+
+samtools flagstat $BAM > $OUT/stats_${NAME}.txt

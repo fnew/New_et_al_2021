@@ -1,0 +1,23 @@
+#$ -S /bin/bash
+#$ -N diamond
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/diamond_genes2kegg.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/annotation
+#$ -l h_vmem=55G
+#$ -q long.q@cbsubrito2
+
+#This script will blast the new twins UK  genes against the kegg gene database
+
+
+REF=/workdir/refdbs
+WRK=/workdir/users/fnn3
+
+DB=$REF/KEGG2/2016/pro_euk_vir_aden_KEGG2016_update2020.pep.dmnd
+#QUERY=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_proteins.faa
+QUERY=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_genes.fa
+
+#OUT=$WRK/twins_uk/genes/annotation/BGI_derep_clust90_proteins_to_KEGG_diamond_output_v2.txt
+OUT=$WRK/twins_uk/genes/annotation/BGI_twins_derep_clust90_genes_KEGG_diamond.txt
+
+#Run DIAMOND
+/programs/diamond/general/diamond blastx -d $DB -q $QUERY -o $OUT

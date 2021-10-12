@@ -1,0 +1,32 @@
+#$ -S /bin/bash
+#$ -N bracken
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/bracken.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/bracken.out
+#$ -t 2-250
+#$ -V
+#$ -wd /workdir/users/fnn3/twins_uk/taxa/bracken
+#$ -pe parenv 1
+#$ -l h_vmem=75G
+#$ -q long.q@cbsubrito2
+
+# Run bracken
+# Set paths
+
+WRK=/workdir/users/fnn3
+
+DESIGN_FILE=$WRK/design_files/twins_names.txt
+  DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+  NAME=`basename $DESIGN`
+
+
+DBNAME=$WRK/scripts/tools/kraken2/kraken2_db
+KREPORT=$WRK/twins_uk/taxa/kraken2_c0.1/${NAME}.kreport
+OUT=$WRK/twins_uk/taxa/bracken_c0.1/${NAME}.bracken
+
+
+#Add things to your path, set threads
+export PATH=/programs/kraken2.1.0:$PATH
+export OMP_NUM_THREADS=1
+export PATH=/programs/Bracken-2.0:/programs/Bracken-2.0/src:/programs/Bracken-2.0/analysis_scripts:$PATH
+
+bracken -d $DBNAME -i $KREPORT -o $OUT -r 100 -l S -t 10

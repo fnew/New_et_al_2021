@@ -1,0 +1,119 @@
+---
+title: "Create Supplemental files"
+output: pdf_document
+---
+
+## I need to merge results together to create supplemental files.
+1. SCCA Results
+  a. Species
+  b. Genes
+  c. SNPs (for both?)
+2. FUMA reslts
+  a. Enrichment results on SNPs
+  b. Enrichment results on genes
+  
+  
+##SCCA Results
+```{r}
+#### SNPs ####
+snp.g1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_alpha_results.csv", header=T, col.names=c("SNP","scca_weight_SNP_genes_comp1"))
+snp.g2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_alpha_comp2_results.csv", header=T, col.names=c("SNP","scca_weight_SNP_genes_comp2"))
+snp.s1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_results.csv", header=T, col.names=c("SNP","scca_weight_SNP_species_comp1"))
+snp.s2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_comp2_results.csv", header=T, col.names=c("SNP","scca_weight_SNP_species_comp2"))
+
+snp.g <- merge(snp.g1, snp.g2, by="SNP")
+snp.s <- merge(snp.s1, snp.s2, by="SNP")
+snp.supp <- merge(snp.g, snp.s, by="SNP")
+
+write.csv(snp.supp, "/workdir/users/fnn3/twins_uk/scca/supplement/SCCA_SNP_Results_allTests.csv", quote=F, row.names = F)
+```
+
+
+```{r}
+#### Microbial genes ####
+genes1 <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_results_mod.csv", header=T, col.names=c("KO", "scca_weight_genes_comp1"))
+genes2 <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_comp2_results.csv", header=T, col.names=c("KO", "scca_weight_genes_comp2"))
+
+genes <- merge(genes1, genes2, by="KO")
+
+#Add in prevalence?
+abun.10 <- read.table("/workdir/users/fnn3/twins_uk/genes/abundance/BGI240_KO_only_geneFamily_table_filt10.txt", header=T, sep="\t")
+
+
+
+
+nonzero <- function(x) sum(x != 0)
+abun.pa <- numcolwise(nonzero)(abun.10)
+abun.pa2 <- as.data.frame(t(abun.pa))
+abun.pa2$KO <- row.names(abun.pa2)
+abun.pa2$KO <- gsub('\\.',',', abun.pa2$KO)
+abun.pa2$prop <- abun.pa2$V1 / 240
+
+dat <- merge(abun.pa2, genes, by="KO", all=T)
+colnames(dat) <- c("Kegg_Orthology","Prevalence","Proportion","SCCA_Weight_Genes_Component1","SCCA_Weight_Genes_Component2")
+
+write.table(dat,"/workdir/users/fnn3/twins_uk/scca/supplement/SCCA_Genes_results.txt", quote=F, row.names = F, sep="\t")
+```
+
+
+```{r}
+
+#### Microbial species ####
+species1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_results_v2.csv", header=T, col.names=c("Species","scca_weight_species_comp1"))
+species2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_comp2_results_v2.csv", header=T, col.names=c("Species","scca_weight_species_comp2"))
+
+species <- merge(species1, species2, by="Species")
+
+
+#Adding in abundance and presence info
+taxa.ab <- read.table("/workdir/users/fnn3/twins_uk/taxa/abundance/twinsUK240_species_abundance_gmeanNormalized_filt10_v2.txt", sep="\t", header=T)
+
+#taxa1 <- read.table("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_results_v2.csv", sep=",", header=T)
+#names(taxa1) <- c("species","comp1")
+#taxa2 <- read.table("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_beta_comp2_results_v2.csv", sep=",", header=T)
+#names(taxa2) <- c("species","comp2")
+
+taxa.all <- merge(taxa1, taxa2, by="species", all=T)
+
+taxa.all$comp[taxa.all$comp1 !=0 & taxa.all$comp2==0] <- 1
+taxa.all$comp[taxa.all$comp1 ==0 & taxa.all$comp2!=0] <- 2
+taxa.all$comp[taxa.all$comp1 !=0 & taxa.all$comp2!=0] <- 3
+taxa.all$comp[taxa.all$comp1 ==0 & taxa.all$comp2==0] <- 0
+
+table(taxa.all$comp)
+#    0    1    2    3 
+#   171  68   350   66
+
+taxa.group <- taxa.all[,-c(2,3)]
+
+nonzero <- function(x) sum(x != 0)
+taxa.pa <- numcolwise(nonzero)(taxa.ab)
+taxa.pa2 <- as.data.frame(t(taxa.pa))
+taxa.pa2$species <- row.names(taxa.pa2)
+taxa.pa2$prop <- taxa.pa2$V1 / 240
+
+#Add cca test group into the presence/absence data
+datsp <- merge(taxa.pa2, taxa.group, by="species", all=T)
+table(datsp$comp)
+#   0    1    2    3  #These are the old numbers
+#5587  149  172    3 
+
+#    0    1    2    3 #New numbers
+#   171  68   350   66
+datsp.ab <- merge(datsp, mean.abund2, by.x="species", by.y=0, all.x=T)
+datsp1 <- datsp.ab[which(datsp.ab$comp=='1'),]
+datsp2 <- datsp.ab[which(datsp.ab$comp=='2'),]
+datsp3 <- datsp.ab[which(datsp.ab$comp=='3'),]
+
+colnames(datsp1) <- c("Species","Prevalence","Proportion","Component1","Abundance")
+colnames(datsp2) <- c("Species","Prevalence","Proportion","Component2","Abundance")
+both <- merge(datsp1, datsp2, by="Species", all=T)
+
+
+###
+final <- merge(species, datsp, by.x="Species", by.y="species")
+colnames(final) <- c("Species","SCCA_Weight_Species_Component1","SCCA_Weight_Species_Component2","Prevalence","Proportion","comp" )
+final$comp <- NULL
+
+write.csv(final,"/workdir/users/fnn3/twins_uk/scca/supplement/SCCA_Species_results.csv", quote=F, row.names = F)
+```

@@ -1,0 +1,28 @@
+#$ -S /bin/bash
+#$ -N cdHITBGI
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/cdhit_prodigal_bgi.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/cdhit
+#$ -l h_vmem=50G
+#$ -pe parenv 8
+#$ -q long.q@cbsubrito2
+
+
+#Cluster the predicted genes from prodigal using 90% identity threshold
+#CD-hit and vsearch both ran for 5 days with no progress. I am going to split up the task and merge at the end.
+#I will cluster each sample on its own then try again to cluster the final one. If this does not work, I can cluster in smaller and smaller chunks. 
+
+
+WRK=/workdir/users/fnn3
+
+FAA=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_proteins.faa
+OUT=BGI_twins_derep_clust90_proteins_v2.faa
+
+#/programs/vsearch-2.15.0/bin/vsearch --cluster_fast $FA --threads 8  --id 0.95 --consout BGI_twins_derep_clustConsSeq_90.fa --centroids BGI_twins_derep_centroids_90.fa
+
+#Try CD-hit agian
+#Word size 5 for threshold 0.70~1.0
+cd $WRK/twins_uk/genes/cdhit
+/programs/cd-hit-4.8.1/cd-hit  -i $FAA -o $OUT -c 0.9 -M 50000 -T 8 -n 5 -d 0
+
+

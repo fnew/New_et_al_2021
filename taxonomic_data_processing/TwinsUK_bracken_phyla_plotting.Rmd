@@ -1,0 +1,65 @@
+---
+title: "TwinsUK_phyla_level_bracken"
+output: pdf_document
+---
+
+
+##I have phyla level information for the 250 twinsUK samples, I want to make some quick plots
+```{r}
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(viridis)
+library(RColorBrewer)
+
+color = grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+n=41
+pie(rep(1,n), col=sample(color, n))
+
+nb.cols = 51
+mycolors <- colorRampPalette(brewer.pal(12, "Set3"))(nb.cols)
+
+```
+
+
+```{r}
+#Import the master table adn split into percent and counts
+phyla <- read.table("/workdir/users/fnn3/twins_uk/taxa/bracken/phyla/combined_phyla.bracken", header=T, sep="\t")
+
+perc <- cbind(phyla$name, select(phyla, contains("frac")))
+ perc <-   rename(perc, name = `phyla$name`)
+perc2 <- perc[rowSums(perc[,-c(1)]) >0,] 
+perc3 <- perc2[rowMeans(perc2[,-c(1)]!=0)>0.50,]
+
+perc4 <- perc2[rowMeans(perc2[,-c(1)]) >0.01,]
+ 
+#Melt the data
+mperc <- perc4 %>% 
+  pivot_longer(!name, names_to = "individual", values_to = "percent")
+
+mperc$individual <- gsub(  "_phyla.bracken_frac", "", mperc$individual)
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/twins_5mostcommonphyla_abundance.pdf", height=10, width=15)
+ggplot(mperc, aes(fill=name, y=percent, x=individual)) +
+  geom_bar(position="stack", stat="identity") +
+  scale_fill_brewer(palette="Set3")
+dev.off()  
+
+
+mperc <- perc2 %>% 
+  pivot_longer(!name, names_to = "individual", values_to = "percent")
+
+mperc$individual <- gsub(  "_phyla.bracken_frac", "", mperc$individual)
+
+pdf("/workdir/users/fnn3/twins_uk/taxa/plots/twins_allPhyla_abundance.pdf", height=10, width=15)
+ggplot(mperc, aes(fill=name, y=percent, x=individual)) +
+  geom_bar(position="stack", stat="identity") +
+  scale_fill_manual(values=mycolors)
+dev.off()  
+
+ ggplot(mperc, aes(fill=name, y=percent, x=individual)) +
+  geom_bar(position="stack", stat="identity") 
+   
+   
+```

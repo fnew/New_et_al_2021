@@ -1,0 +1,47 @@
+#$ -S /bin/bash
+#$ -N sam2bam
+#$ -V
+#$ -t 201-250
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/sam2bam.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=15G
+#$ -q short.q@cbsubrito2
+
+#This script will convert sam to bam
+#Start with 1-100 so I can delete those sams
+
+#Set directories
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+SAM=/workdir/users/fnn3/twins_uk/genes/align/bwa_out/filtered_sam/${NAME}_filtered.sam
+BAMOUT=$WRK/twins_uk/genes/align/bwa_out/bam
+  if [ ! -d $BAMOUT ]; then mkdir -p $BAMOUT; fi
+
+#Create LOGS
+#LOGS=$BAMOUT/logs
+#	if [ ! -e $LOGS ]; then mkdir -p $LOGS; fi
+#MYLOG=$LOGS/${NAME}.log
+#printf "`date` $NAME TASK_ID:$SGE_TASK_ID HOSTNAME:$HOSTNAME \n\n" > "${MYLOG}"
+
+#Path to samtools
+#export PATH=/programs/samtools-0.1.19:$PATH
+
+
+#Call SAMtools
+#printf "<------------- Convert SAM to BAM ---------------->" >> "${MYLOG}"
+#echo `date`": Starting SAM to BAM conversion" >> "${MYLOG}"
+
+
+samtools view -ubh -F 0x900 $SAM  > $BAMOUT/${NAME}_filtered90_primary.bam # 2>> "${MYLOG}"
+samtools sort -m 1000000000 $BAMOUT/${NAME}_filtered90_primary.bam -o $BAMOUT/${NAME}_filtered90_primary.sorted.bam # 2>> "${MYLOG}"
+samtools index $BAMOUT/${NAME}_filtered90_primary.sorted.bam # >> "${MYLOG}"
+
+
+#echo `date`": Finished SAM to BAM conversion" >> "${MYLOG}"
+
+#Finish the log
+#echo `date`": Finished script complete" >> "${MYLOG}"

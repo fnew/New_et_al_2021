@@ -1,0 +1,30 @@
+#$ -S /bin/bash
+#$ -N bracken
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/bracken2mpa.err
+#$ -o /workdir/users/fnn3/scripts/LOGS/twins_uk/bracken2mpa.out
+#$ -t 1-250
+#$ -V
+#$ -wd /workdir/users/fnn3/twins_uk/taxa/bracken
+#$ -pe parenv 1
+#$ -l h_vmem=5G
+#$ -q long.q@cbsubrito2
+
+# Convert kreport to mpa format
+# Set paths
+
+WRK=/workdir/users/fnn3
+
+DESIGN_FILE=$WRK/design_files/twins_names.txt
+  DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+  NAME=`basename $DESIGN`
+
+BREPORT=$WRK/twins_uk/taxa/kraken2/${NAME}_bracken.kreport
+OUT=$WRK/twins_uk/taxa/bracken/${NAME}_bracken.mpa
+
+
+#Add things to your path, set threads
+export PATH=/programs/kraken2.1.0:$PATH
+export OMP_NUM_THREADS=1
+export PATH=/programs/Bracken-2.0:/programs/Bracken-2.0/src:/programs/Bracken-2.0/analysis_scripts:$PATH
+
+/programs/Bracken-2.0/src/kreport2mpa.py -r $BREPORT -o $OUT --display-header

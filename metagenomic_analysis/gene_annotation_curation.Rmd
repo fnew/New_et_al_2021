@@ -1,0 +1,72 @@
+---
+title: "Updated TwinsUK Gene Catalog Annotation Curation"
+output: pdf_document
+---
+
+##Creation and Confirmation of Annotations for the newly updated TwinsUK gene catalog for 250 twins.
+
+###First step, I need to read in the pfam and KEGG annotations, and merge them with the gene catalog (modified RPKM counts)
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(reticulate) #python interfacing library
+
+Sys.setenv(RETICULATE_MINICONDA_PATH = "/home/fnn3/miniconda3")
+use_condaenv("r-reticulate")
+```
+
+
+
+```{r, echo=F}
+#Create env for python in Rstudio
+#conda_create("r-reticulate", conda="/home/fnn3/miniconda3/bin/conda")
+pandas <- import("pandas")
+pd <- import("pandas",as="pd",convert=FALSE)
+```
+
+
+```{r}
+#Import data
+#genes = pandas.read_csv("/workdir/users/fnn3/twins_uk/genes/abundance/twinsUK_geneAbun_unagg_filt90_primary.csv",na_values="0")
+
+kegg=pd$read_csv("/workdir/users/fnn3/twins_uk/genes/annotation/BGI_derep_clust90_KEGG_4col_nomissingKO_topHits.csv", names = c("gene","pid","alnlen","ko"), usecols = c("gene","ko"))
+
+pfam=pd$read_csv("/workdir/users/fnn3/twins_uk/genes/annotation/BGI_derep_clust90_proteins_pfam_topHits.txt", names=c("gene","access","pfam","eval","score","bias"), usecols = c("gene","pfam"), sep="\t")
+
+twins = pd$read_csv("/workdir/users/fnn3/twins_uk/genes/abundance/twinsUK_aligned_genes.txt")
+```
+
+```{r}
+twins_kegg = twins$merge(kegg, how='left', left_on='gene_id', right_on='gene')
+#twins.kegg$head()
+
+```
+
+
+
+##The unknown function genes have been clustered (AA, 80%) and the cdHit output parsed. I need to create a unique ID for each cluster. I want to include the size of the cluster. 
+```{r, echo=F}
+clstr = read.csv("/workdir/users/fnn3/twins_uk/genes/annotation/BGI_twins_genes_noKO_clust80_parsed.clstr.txt", sep='\t', header=TRUE)
+
+clstr$annotation = paste("clstr",clstr$clstr, clstr$clstr_size, sep='_')
+write.csv(clstr, "/workdir/users/fnn3/twins_uk/genes/annotation/BGI_noKO_clust80_gene_annotation_full.csv", sep=',', quote=F, row.names=F)
+
+
+#Make the smaller annotation file too
+clstr.small <- clstr[,c(1, 8)]
+write.csv(clstr.small, "/workdir/users/fnn3/twins_uk/genes/annotation/BGI_noKO_clust80_gene_annotation_2col.csv", quote=F, row.names=F)
+```
+
+
+##I reclustered at 60% to try to get a few more clusters. Need to create cluster ID again and create a big "unknown" column for all unique genes
+```{r, echo=F}
+size <- read.csv("/workdir/users/fnn3/twins_uk/genes/annotation/BGI_twins_genes_noKO_clust60_clustSize.txt", sep='\t', header=TRUE)
+
+#Create unique ID for clusters
+size$annotation <- paste("clstr",size$clstr, size$clstr_size, sep='_')
+size$annotation[size$clstr_size ==1] <- c("unknown")
+
+write.csv(size, "/workdir/users/fnn3/twins_uk/genes/annotation/BGI_noKOclust60_gene_annotation.csv", sep=',', quote=F, row.names=F)
+
+```

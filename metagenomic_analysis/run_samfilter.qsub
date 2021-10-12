@@ -2,32 +2,27 @@
 #$ -N sam_filter
 #$ -V
 #$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/sam_filtering.err
-#$ -t 1-32
+#$ -t 201-250
 #$ -l h_vmem=2G
 #$ -q short.q@cbsubrito2
 
-
 ## This script will filter the bam files using a custom perl script.
 
-PROJ=/workdir/users/fnn3
-
+WRK=/workdir/users/fnn3
 
 #Create design file of file names
-
-DESIGN_FILE=$PROJ/design_files/trunc_twins.csv
-	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
-	IFS=',' read -ra ARRAY <<< "$DESIGN"
-
-	NAME=${ARRAY[0]}
-	BATCH=${ARRAY[1]}
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
 
 #BAM=$PROJ/twins_uk/bam/${NAME}.bam
-SAM=$PROJ/twins_uk/alignments/${NAME}.sam
-OUT=$PROJ/twins_uk/alignments/filtered_sam/${NAME}_filter.sam
+#SAM=$PROJ/twins_uk/alignments/${NAME}.sam
+#OUT=$PROJ/twins_uk/alignments/filtered_sam/${NAME}_filter.sam
 
-PROG=$PROJ/scripts/filterSamByIdentity.pl
+SAM=$WRK/twins_uk/genes/align/bwa_out/${NAME}.sam 
+OUT=$WRK/twins_uk/genes/align/bwa_out/filtered_sam/${NAME}_filtered.sam
+
+PROG=/workdir/scripts/analyzing_alignments/filterSamByIdentity.pl
 
 ## Usage: <input SAM/BAM> <percent identity> <min M/L> <min %M> <output type, 1=SAM> <include header?> <out>
-perl $PROG $SAM 90 0 0 1 yes > $OUT 
-
-
+perl $PROG $SAM 90 0 0 1 1 > $OUT 

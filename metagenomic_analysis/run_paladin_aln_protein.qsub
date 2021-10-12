@@ -1,0 +1,59 @@
+#$ -S /bin/bash
+#$ -N alnAA
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/aln_paladin.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/align
+#$ -l h_vmem=110G
+#$ -pe parenv 8
+#$ -q long.q@cbsubrito2
+#$ -t 10
+
+# Script to align metagenomic reads to proteins
+# First step is to merge reads (Pear), then align using Paladin
+# This method relies on the reads having overlap (appropriate insert size)
+# Keep track of how many reads are lost that do not merge
+
+#I tried using Pear and it failed to merge most of my reads: 615,208 / 43,191,119 reads were merged.
+#Looking into methods for this, it seems like using only the R1 reads will work fine.
+
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+FQ1=/workdir/data/twins/3-derep/${NAME}_1.fastq
+FQ2=/workdir/data/twins/3-derep/${NAME}_2.fastq
+REF=$WRK/twins_uk/genes/cdhit/BGI_twins_derep_clust90_proteins.faa
+#REF=$WRK/twins_uk/genes/cdhit
+#REF=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_proteins.faa
+
+#Set up logging
+LOGS=$WRK/twins_uk/genes/align/logs
+  if [ ! -e $LOGS ]; then mkdir -p $LOGS; fi
+MYLOG=$LOGS/${NAME}.log
+printf "BEGIN: `date` $NAME TASK_ID:$SGE_TASK_ID HOSTNAME:$HOSTNAME \n\n" > "${MYLOG}"
+
+#Set up env
+export PATH=/home/fnn3/miniconda3/bin:$PATH
+eval "$(/home/fnn3/miniconda3/bin/conda shell.bash hook)"
+conda activate protein_aln
+
+
+######################################################
+## Run Paladin
+######################################################
+
+# Outside of this script, I ran paladin index on the reference
+# paladin index -r3 BGI_twins_derep_clust90_proteins.faa
+# -r3 indicates that the reference contains protein sequences
+
+OUT=$WRK/twins_uk/genes/align
+#  if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+paladin align -t 8  $REF $FQ1 > ${OUT}/${NAME}.sam
+#samtools view -b -F 0x904 -f 0x2 -q 10  -o $OUT/${NAME}.filt.bam $OUT/${NAME}.sam >> "${MYLOG}"
+#samtools sort -o $OUT/${NAME}.filt.sorted.bam  $OUT/${NAME}.filt.bam  >> "${MYLOG}"
+#samtools index $OUT/${NAME}.filt.sorted.bam >> "${MYLOG}"
+
+conda deactivate

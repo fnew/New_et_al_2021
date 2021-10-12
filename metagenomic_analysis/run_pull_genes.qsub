@@ -1,0 +1,20 @@
+#$ -S /bin/bash
+#$ -N pull_fasta
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/pull_fa.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/vsearch
+#$ -l h_vmem=50G
+#$ -pe parenv 1
+#$ -q long.q@cbsubrito2
+
+##Little script to pull out genes from a fasta file of nucleotides based on header names from a protein file
+
+WRK=/workdir/users/fnn3
+IN=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_genes_nuc.fa
+WANT=$WRK/twins_uk/genes/cdhit/clustered90_proteins_headers.txt
+OUT=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_genes_nuc_prot90_subset.fa
+
+
+grep --no-group-separator -A1 -f $WANT $IN >> $OUT
+
+#python2 $WRK/scripts/general_use/extract_fa_seq.py $IN $WANT $OUT

@@ -1,0 +1,404 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+
+##Analyzing the microbial genes with nonzero coefficients from CCA
+
+```{r, echo=F}
+library(ggplot2)
+library(data.table)
+library(reshape2)
+setwd("/workdir/users/fnn3")
+```
+
+```{r, echo=F}
+path <- read.csv("/workdir/users/fnn3/references/kegg_pathway_to_ko/pathway.2.list", sep="\t", header=F) #map number and pathway
+  colnames(path ) <- c("map","pathway")
+kopath <- read.csv("/workdir/users/fnn3/references/kegg_pathway_to_ko/all_kegg_path2map.txt", sep="\t", header=F) #ko and map number
+  colnames(kopath) <- c("map", "ko")
+ko <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/list_micr_genes_nonzero_names.csv", header=F ) #scca results
+  colnames(ko) <- c("ko")
+  
+kopath2 <- merge(ko, kopath, by="ko", all.x=T) 
+#Many KO numbers map to multiple pathways.
+
+table(kopath2$map)
+
+kopathway <- merge(kopath2, path, by="map", all.x=T)
+write.table(kopathway, "/workdir/users/fnn3/twins_uk/scca/twinsUK_nonzero_kopathway.txt", sep="\t", quote=F, row.names = F)
+
+```
+
+
+
+#To do pathway enrichment analysis, I need to rest of the genes that are not in the cca results
+```{r, echo=F}
+ko.cca <- ko
+ko.cca$cca <- c("1")
+
+#import the rest of the genes that were analyzed by had 0s. 
+#This list, because of how some gene families contained multiple KOs, may contain some overlap with the results. i'm going to drop those. 
+zero.ko <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_zeros.csv", header=F) #25,973
+  colnames(zero.ko) <- c("ko")
+#Will a merge take care of this?
+full.ko <- merge(ko.cca, zero.ko, by="ko", all=T)
+full.ko[is.na(full.ko)] <- 0 
+full.ko2 <- unique(full.ko[,1:2])
+
+
+table(full.ko2$cca) #307 scca KOs... this shuld be 329?
+ko.uniq <- unique(ko) #307
+
+#Bring in pathway information
+full.kopath <- merge(full.ko2, kopath, by="ko", all.x=T) #16,707, many KO map to many pathways
+full.path <- full.kopath[,c(-1)]
+u.path <- unique(full.path[,1:2])
+
+table(full.kopath$cca ,full.kopath$map)
+
+
+
+#Need to do a series of fishers exact tests. All genes, each pathway. Tabulate if the gene is in a pathway and if it was chosen by cca
+#
+casted.data <- dcast(full.kopath, ko ~ map  )
+si <- unique(full.kopath[,c(1,3)])
+dcast(si, formula = ko ~ map, fun.aggregate = length)
+
+library(tidyr)
+library(dplyr)
+
+forfisher<- full.kopath %>%
+  mutate(yesno = 1) %>%
+  distinct %>%
+  spread(map, yesno, fill = 0)
+forfisher2 <- forfisher %>%
+  mutate(across(everything(), as.factor))
+
+row.names(forfisher2) <- forfisher2$ko
+forfisher2[,1] <- NULL
+
+pathway.enrich<- purrr::map(forfisher2, ~fisher.test(.x, forfisher2$cca)) %>%
+  purrr::map_dfr(broom::tidy, .id ="map")
+
+pathway.enrich$fdr_p <- p.adjust(pathway.enrich$p.value, method="fdr")
+
+#Only one pathway is enriched with p<0.05: 
+#map02024	3.9030873	5.435431e-06	2.204201e+00	6.5515296	Fisher's Exact Test for Count Data	two.sided	0.001187642 <----Quorum sensing
+#map00620	3.5240715	4.141346e-04	1.732504e+00	6.5736870	Fisher's Exact Test for Count Data	two.sided	0.060325606 <----Pyruvate metabolism
+
+pathway.enrich <- pathway.enrich[-1,]
+pe.name <- merge(pathway.enrich, kopathway, by="map", all.x=T)
+
+write.table(pe.name, "/workdir/users/fnn3/twins_uk/scca/twinsUK_pathway_enrichment.txt", quote=F, row.names = F, sep="\t")
+
+```
+
+
+
+#Let's check how common these genes are in the 240 individuals
+```{r, echo=F}
+#Import the data that I used in the CCA model
+abun.10 <- read.table("/workdir/users/fnn3/twins_uk/genes/abundance/BGI240_KO_only_geneFamily_table_filt10.txt", header=T, sep="\t")
+ko_names <- read.table("/workdir/users/fnn3/twins_uk/scca/list_micr_genes_nonzero_names.csv", header=T, sep="\t")
+  ko_names$KO <- gsub(",",".", ko_names$KO)
+
+names.use <- names(abun.10)[(names(abun.10) %in% ko_names$KO)]
+names.use <- append("bgi_id", names.use)
+abun.10.cca <- abun.10[, names.use]
+
+write.table(abun.10.cca, "/workdir/users/fnn3/twins_uk/scca/micr_genes_selectedByCCA_abundances.txt", quote=F, sep="\t")
+
+cca.prop <- data.frame(matrix(NA, nrow=168,ncol=1))
+colnames(cca.prop) <- (c("probability_not0"))
+rownames(cca.prop) <- colnames(abun.10.cca)
+
+for(i in 1:ncol(abun.10.cca)){
+  p_0 <- sum(abun.10.cca[i]!="0") / 240 #now it equals how many ppl have this gene
+  cca.prop[i,] <- p_0
+}
+
+
+sum(cca.prop$probability_not0==1) #25 gene families 
+
+cca.prop$group[cca.prop$probability_not0 < 0.01] <- c("Less than 1%")
+cca.prop$group[cca.prop$probability_not0>=0.01 & cca.prop$probability_not0 < 0.25] <- c("1% to 25%")
+cca.prop$group[cca.prop$probability_not0>=0.25 & cca.prop$probability_not0 < 0.50] <- c("25% to 50%")
+cca.prop$group[cca.prop$probability_not0>=0.50 & cca.prop$probability_not0 < 0.75] <- c("50% to 75%")
+cca.prop$group[cca.prop$probability_not0>=0.75 & cca.prop$probability_not0 < 1] <- c("75% to 100%")
+cca.prop$group[cca.prop$probability_not0 == 1] <- c("100%")
+
+
+
+forpie.cca <- as.data.frame(table(cca.prop$group))
+ggplot(forpie.cca, aes(x="", y=Freq, fill=Var1)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()
+
+
+forpie.cca <- forpie.cca %>% 
+  arrange(desc(Var1)) %>%
+  mutate(prop=Freq / sum(forpie.cca$Freq) * 100) %>%
+  mutate(ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(forpie.cca, aes(x="", y=prop, fill=Var1)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  geom_text(aes(y = ypos, label = round(prop)), color = "white", size=6) +
+  scale_fill_brewer(name="Percent samples detected" ,palette="Dark2") +
+  ggtitle("Genes selected by CCA")
+
+```
+
+```{r, echo=F}
+#I need these genes for running GEMMA to get SNP heritability 
+cca.common <- cca.prop[(cca.prop$probability_not0==1),]
+write.csv(cca.common, "/workdir/users/fnn3/twins_uk/scca/twinsUK_scca_nonzeroBeta_common240.txt", quote=F, row.names = T)
+core.genes <- read.table("/workdir/users/fnn3/twins_uk/scca/twinsUK_scca_nonzeroBeta_common240.txt", sep="\t")
+  core.genes$V1 <- gsub(",",".",core.genes$V1) #R converts the column heads to '.'
+
+idx <- match(core.genes$V1, names(abun.10))
+core.genes.abun <- abun.10[,c(1, idx)]
+
+write.table(core.genes.abun, "/workdir/users/fnn3/twins_uk/scca/twinsUK_scca_nonzeroBeta_common240_abun.txt", quote=F, sep="\t")
+#I probably need the ither IDs for this to work, not the BGI
+covariates <- read.csv("/workdir/users/fnn3/twins_uk/metadata/twinsUK240_zyg_age_ship_bmi_family.csv")
+meta <- read.csv("/workdir/users/fnn3/twins_uk/metadata/Brito_BGI_twins_metadata.csv")
+ meta$BGI <- paste0("BGI",meta$BGI_ID)
+
+meta2 <- merge(covariates, meta, by="BGI", all.x=T)
+meta3 <- meta2[,c(1,16)] 
+
+covariates2 <- merge(meta3, covariates, by="BGI")
+core.genes.abun2 <- merge(meta3, core.genes.abun, by.x="BGI", by.y="bgi_id")
+core.genes.abun.4.gemma <- core.genes.abun2[,c(-1,-2)]
+write.table(core.genes.abun.4.gemma, "/workdir/users/fnn3/twins_uk/scca/twinsUK240_scca_nonzeroBeta_common_abun_forGEMMA.txt", quote=F, sep="\t", col.names = F, row.names=F)
+write.table(covariates2, "/workdir/users/fnn3/twins_uk/metadata/twinsUK240_zyg_age_ship_bmi_family_indvID.csv", quote=F, sep=",")
+
+cov3 <- covariates2[,c(3,5,6)]
+cov3$intercept <- 1
+cov4 <- cov3 %>%
+  select("intercept", everything())
+write.table(cov4, "/workdir/users/fnn3/twins_uk/metadata/twinsUK240_age_ship_bmi_indvID_forGEMMA.csv", quote=F, sep="\t", row.names = F, col.names = F)
+```
+
+
+```{r, echo=F}
+#Plot the abundance of each gene chosen by cca across ppl
+ggplot(stack((abun.10.cca)), aes(x=ind, y=values)) +
+  geom_boxplot()
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/dist_gene_abun_cca.pdf", height=6, width=12)
+ggplot(stack(log(abun.10.cca)), aes(x=ind, y=values)) +
+  geom_boxplot() +
+  theme_few() +
+  theme(axis.text.x = element_blank()) +
+  xlab("Gene family") + ylab("log(abundance) across individuals") 
+dev.off()
+
+#Mean
+mean.abun <- as.data.frame(apply(abun.10.cca, 2, function(c) mean(c)))
+  mean.abun$Sample <- rownames(mean.abun)
+  colnames(mean.abun) <- c("Mean","Gene_Family")
+
+  pdf("/workdir/users/fnn3/twins_uk/scca/mean_gene_abun_cca.pdf", height=6, width=10)
+ggplot(mean.abun, aes(x=reorder(Gene_Family, -Mean), y=Mean)) +
+  geom_point(alpha=0.25) +
+  xlab("Gene Family") + ylab("Mean Gene Family Abundance") +
+  theme_few() +
+  theme( axis.text.x = element_blank()) 
+dev.off()
+
+
+#Can I replot the log(abun) but order the genes by proportion of zeros?
+zeros <- data.frame(matrix(NA, nrow=168,ncol=1))
+colnames(zeros) <- (c("probability_0"))
+rownames(zeros) <- colnames(abun.10.cca)
+
+for(i in 1:ncol(abun.10.cca)){
+  p_0 <- sum(abun.10.cca[i]=="0") / 240 #How many zeros this gene has
+  zeros[i,] <- p_0
+}
+zeros$gene <- row.names(zeros)
+
+
+zeros.order <- (zeros[order(zeros$probability_0),])
+names(zeros.s) <- "Probability_0"
+zeros.order$order <- 1:nrow(zeros.order)
+
+test <- stack(log(abun.10.cca))
+test2 <- merge(test, zeros.order, by.x="ind", by.y = "gene")
+
+pdf("/workdir/users/fnn3/twins_uk/scca/dist_gene_abun_cca.pdf", height=8, width=20)
+ggplot(test2, aes(x=reorder(ind, order), y=values, colour=probability_0)) +
+  geom_boxplot() +
+  theme_few() +
+  theme(axis.text.x = element_blank(),
+        axis.title.x= element_text(size=28),
+        axis.text.y = element_text(size=24),
+        axis.title.y = element_text(size=28),
+        legend.title =element_text(size=28),
+        legend.text = element_text(size=24)) +
+  scale_colour_gradient(name="Proportion of zeros") +
+  xlab("Gene family") + ylab("log(abundance) across \nindividuals") 
+dev.off()
+```
+
+
+##Get the kegg gene ids so i can extract them from the kegg protein file
+```{r}
+kegg.id <- read.delim("/workdir/refdbs/KEGG2/2016/pro_euk_vir_aden_KEGG2016_2col.dat", sep="\t", header=F)
+  names(kegg.id) <- c("kegg_gene","KO")
+  
+kegg.id <- read.delim("/workdir/refdbs/KEGG2/2016/prokaryotes_2col.dat", sep="\t", header=F)
+  names(kegg.id) <- c("kegg_gene","KO")  
+ko_names <- read.table("/workdir/users/fnn3/twins_uk/scca/list_micr_genes_nonzero_names.csv", header=T, sep="\t")
+  ko_names$KO <- gsub(",",".", ko_names$KO)
+
+cca.genes <- merge(ko_names, kegg.id, by="KO", all.x=T)
+```
+
+
+
+##I have Kegg BRITE ingormation now
+```{r}
+#I decided to remove KEGG_Orthology because it is not informatice. Splicesome is not relevant
+brite <- c("Enzymes","Transporters","Peptidases","Secretion_system","Chaperones_and_folding_catalysts","Transcription_factors","Exosome","Prokaryotic_defense_system","Glycosyltransferases","Transfer_RNA_biogenesis","Membrane_trafficking","Chromosome_and_associated_proteins","Mitochondrial_biogenesis","DNA_repair_and_recombination_proteins","Two-component_system","mRNA_biogenesis","Lipopolysaccharide_biosynthesis_proteins","Lipid_biosynthesis_proteins","Ribosome_biogenesis","Amino_acid_related_enzymes","Bacterial_motility_proteins","Cytoskeleton_proteins","Proteasome","Ribosome","Domain-containing_proteins_unclassified","Protein_phosphatases","Viral_proteins","Antimicrobial_resistance_genes","Bacterial_toxins","DNA_replication_proteins","GPI-anchored_proteins","Photosynthesis_proteins","Protein_kinase","Polyketide_biosynthesis_protein")
+ngenes <- c(159,68,16,14,9,9,7,6,6,6,6,4,4,4,4,4,4,3,3,3,3,2,2,2,1,1,1,1,1,1,1,1,1,1)
+df <- data.frame(brite, ngenes)
+
+pdf("/workdir/users/fnn3/twins_uk/scca/plots/microbial_genes_kegg_brite_barplot.pdf", height=8, width=10)
+ggplot(df, aes(reorder(brite,ngenes), ngenes)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  theme_classic()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_text(size=14)) 
+dev.off()
+```
+
+```{r}
+########## BRITE enrichment tests ###############
+
+##Import the brite information
+brite.names <- read.csv("/workdir/users/fnn3/references/kegg_brite/brite2.list", sep="\t", header=F) #brite number and pathway
+  colnames(brite.names ) <- c("brite","pathway")
+brite <- read.csv("/workdir/users/fnn3/references/kegg_brite/all_kegg_brite_to_ko.txt", sep="\t", header=F) #ko and brite number
+  colnames(brite) <- c("brite", "ko")
+
+#Enzyme sub-categories
+enz <- read.table("/workdir/users/fnn3/references/ko01000_ko3.csv", header=F, sep=",", fill=T)
+  colnames(enz) <- c("ko","Enzyme_type")
+enz2 <- unique(enz)  
+
+brites <- merge(brite, brite.names, by="brite")
+br.enz <- brites[which(brites$pathway=="Enzymes"),]
+test <- merge(enz, br.enz, by="ko",all.y=T)
+
+  
+  
+#Individual scca selected genes
+comp1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/comp1_micr_genes_selectedCCA_names.txt", header=F ) #scca results
+  colnames(comp1) <- c("ko")
+comp2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_beta_comp2_nonzero_names_only.csv", header=F ) #scca results
+  colnames(comp2) <- c("ko")
+  
+all <- read.table("/workdir/users/fnn3/twins_uk/scca/gene_results/all_micr_genes_tested.txt", header=F)  #All KOs
+colnames(all) <- c("ko")
+
+####Do Component 1 first 
+comp1$cca <- 1
+
+comp1all <- merge(comp1, all, by="ko", all=T)
+comp1all[is.na(comp1all)] <- 0 
+
+comp1all2 <- merge(comp1all, brite, by="ko", all=T )
+comp1all2[is.na(comp1all2)] <- 0 
+comp1all3 <- comp1all2[which(comp1all2$brite!='0'),]
+
+
+
+forfisher.c1<- comp1all3 %>%
+  mutate(yesno = 1) %>%
+  distinct %>%
+  spread(brite, yesno, fill = 0)
+#forfisher2 <- forfisher %>%
+#  mutate(across(everything(), as.factor))
+forfisher2.c1 <- forfisher.c1 %>%
+  mutate_if(is.numeric,as.factor)
+#forfisher2[,-1] <- lapply(forfisher2[,-1], as.factor)
+forfisher2.c1[is.na(forfisher2.c1)] <- 0
+
+row.names(forfisher2.c1) <- forfisher2.c1$ko
+forfisher2.c1[,1] <- NULL
+
+sapply(forfisher2.c1, function(col) length(unique(col)))
+forfisher2.c1$ko00001 <- NULL
+
+pathway.enrich.c1 <- purrr::map(forfisher2.c1, ~fisher.test(.x, forfisher2.c1$cca, alternative="greater")) %>%
+  purrr::map_dfr(broom::tidy, .id ="brite")
+
+pathway.enrich.c1$fdr_p <- p.adjust(pathway.enrich.c1$p.value, method="fdr")
+c1.enrich <- merge(pathway.enrich.c1, brite.names, by="brite", all.x=T)
+c1.enrich2 <- c1.enrich[which(c1.enrich$p.value<0.1),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gene_results/component1_micr_gene_brite_enrichment.pdf", height=6, width=10)
+ggplot(c1.enrich2[-c(2),], aes(pathway, -log(p.value))) +
+  geom_bar(fill="#E69F00",stat="identity") +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=18))
+dev.off()
+
+##### Do Component 2 
+comp2$cca <- 1
+
+comp2all <- merge(comp2, all, by="ko", all=T)
+comp2all[is.na(comp2all)] <- 0 
+
+comp2all2 <- merge(comp2all, brite, by="ko", all=T )
+comp2all2[is.na(comp2all2)] <- 0 
+comp2all3 <- comp2all2[which(comp2all2$brite!='0'),]
+
+
+forfisher.c2<- comp2all3 %>%
+  mutate(yesno = 1) %>%
+  distinct %>%
+  spread(brite, yesno, fill = 0)
+#forfisher2 <- forfisher %>%
+#  mutate(across(everything(), as.factor))
+forfisher2.c2 <- forfisher.c2 %>%
+  mutate_if(is.numeric,as.factor)
+#forfisher2 <- lapply(forfisher, as.factor)
+forfisher2.c2[is.na(forfisher2.c2)] <- 0
+
+row.names(forfisher2.c2) <- forfisher2.c2$ko
+forfisher2.c2[,1] <- NULL
+sapply(forfisher2.c2, function(col) length(unique(col)))
+forfisher2.c2$ko00001 <- NULL
+
+pathway.enrich.c2<- purrr::map(forfisher2.c2, ~fisher.test(.x, forfisher2.c2$cca, alternative="greater")) %>%
+  purrr::map_dfr(broom::tidy, .id ="brite")
+
+pathway.enrich.c2$fdr_p <- p.adjust(pathway.enrich.c2$p.value, method="fdr")
+pathway.enrich.c2[which(pathway.enrich.c2$p.value <0.1),]
+
+c2.enrich <- merge(pathway.enrich.c2, brite.names, by="brite", all.x=T)
+c2.enrich2 <- c2.enrich[which(c2.enrich$p.value<0.1),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/gene_results/component2_micr_gene_brite_enrichment.pdf", height=6, width=10)
+ggplot(c2.enrich2[-c(3),], aes(pathway, -log(p.value))) +
+  geom_bar(fill="#56B4E9",stat="identity") +
+  coord_flip() +
+  theme_classic() +
+  theme(text=element_text(size=18))
+dev.off()
+```
+

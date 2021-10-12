@@ -1,0 +1,575 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+##New markdown for looking at all CCA selected SNPs and comparing them
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(biomaRt)
+library(tidyr)
+library(dplyr)
+```
+
+
+
+#Import data
+```{r}
+snp.g1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/nonzero_snp_list.txt", header=T)
+snp.g2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/gene_results/twinsUK_alpha_comp2_nonzero_results_rsID.csv", header=T)
+
+snp.s1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_nonzero_results_rsID.txt", header=T)
+snp.s2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_comp2_nonzero_results_rsID.txt", header=T)
+
+
+#From "retrieve_snp_annotation_biomart.Rmd": the gwas snp lists
+
+davenport <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Davenport_S7_rsids.txt", header=F)
+ colnames(davenport) <- c("refsnp_id")
+ davenport$source <- c("davenport")
+goodrich <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Goodrich_S5_rsids.txt", header=F)
+  colnames(goodrich) <- c("refsnp_id")
+  goodrich$source <- c("goodrich")
+hughes <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Hughes_S5_rsids.txt", header=F)
+  colnames(hughes) <- c("refsnp_id")
+  hughes$source <- c("hughes")
+wang <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Wang_T2_rsids.txt", header=F)
+  colnames(wang) <- c("refsnp_id")
+  wang$source <- c("wang")
+turpin <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Turpin_S6_rsids.txt", header=F)
+  colnames(turpin) <- c("refsnp_id")
+  turpin$source <- c("turpin")
+rothschild14 <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Rothschild_S14_rsids.txt", header=F)
+  colnames(rothschild14) <- c("refsnp_id")
+  rothschild14$source <- c("rothschild14")
+rothschild26 <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Rothschild_S26_rsids.txt", header=F)
+  colnames(rothschild26) <- c("refsnp_id")
+  rothschild26$source <- c("rothschild26")
+igartua <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Igartua_T2_rsids.txt", header=F) #This one is not gut
+  colnames(igartua) <- c("refsnp_id")
+  igartua$source <- c("igartua")
+bonder <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Bonder_S3_rsids.txt", header=F)
+  colnames(bonder) <- c("refsnp_id")
+  bonder$source <- c("bonder")
+blekhman <- read.csv("/workdir/users/fnn3/references/gwas_annotation/Blekhman_S5_rsids.txt", header=F)
+  colnames(blekhman) <- c("refsnp_id")
+  blekhman$source <- c("blekhman")
+
+ext_gwas <- rbind(davenport, goodrich, hughes, wang, turpin, rothschild14, rothschild26, igartua, bonder, blekhman)
+ext_gwas$refsnp_id <- trimws(ext_gwas$refsnp_id, which=c("both"))
+
+#Try the latest paper,Kurilshikov et al 
+kurilshikov <- read.csv("/workdir/users/fnn3/references/gwas_annotation/MBG.allHits.p1e4.txt",sep="\t")
+
+```
+
+```{r}
+#Add column to specify which results each one is adn then combine to look for overlap
+snp.g1$cca_genes_comp1 <- 1
+snp.g2$cca_genes_comp2 <- 1
+snp.s1$cca_species_comp1 <- 1
+snp.s2$cca_species_comp2 <- 1
+
+snp.g1g2 <- merge(snp.g1, snp.g2, by="SNP", all=T)
+snp.g1g2s1 <- merge(snp.g1g2, snp.s1, by="SNP", all=T)
+snp.all <- merge(snp.g1g2s1, snp.s2, by="SNP", all=T)
+
+snp.all$rowsum <- rowSums(snp.all[,-1], na.rm=T)
+check <- snp.all[(snp.all$rowsum == 2),]
+
+table(check$cca_genes_comp1, check$cca_species_comp1) #82
+table(check$cca_genes_comp1, check$cca_species_comp2) #0 
+table(check$cca_genes_comp2, check$cca_species_comp1) #1
+table(check$cca_genes_comp2, check$cca_species_comp2) #16
+table(snp.all$rowsum)
+```
+
+
+```{r}
+#Check overlap wiht previous papers
+check2 <- merge(snp.all, ext_gwas, by.x="SNP", by.y="refsnp_id") # 0
+check3 <- merge(snp.all, kurilshikov, by.x="SNP", by.y="rsID") #10, actually 8, one is repeated 3 times 
+```
+
+
+```{r}
+##### Biomart 
+### I need the hg37 (hg19) snp annotations!
+snp <- as.data.frame(snp.all$SNP)
+listMarts(host="useast.ensembl.org")
+grch37 = useMart(biomart="ENSEMBL_MART_SNP", host="grch37.ensembl.org", path="/biomart/martservice")
+snp_mart = useMart(biomart="ENSEMBL_MART_SNP", host="grch37.ensembl.org", path="/biomart/martservice", dataset="hsapiens_snp")
+#useast.ensembl.org, listEnsembl("GRCh=37")
+
+mart <- useMart("ENSEMBL_MART_SNP")
+listDatasets(snp_mart)
+dataset <- useDataset("hsapiens_snp", mart=snp_mart)
+listFilters(dataset)
+listAttributes(dataset)
+
+snp.info <- getBM(attributes=c("refsnp_id", "chr_name", "chrom_start", "allele", "minor_allele", "minor_allele_freq"),
+      filters= "snp_filter",
+      values=snp,
+      mart=snp_mart)
+
+#Get the test number id and save files, really only need the first three columns for FUMA
+snp.test <- merge(snp.info, snp.all, by.x="refsnp_id", by.y="SNP",all=T)
+#snp.test2 <- snp.test[,-c(4:12)]
+write.table(snp.test, file="/workdir/users/fnn3/twins_uk/scca/snp_location_all_tests_v2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+##Might be easier to split these up by test now and work on seprate annotations?
+snp.test.g1 <- unique(snp.test[which(snp.test$cca_genes_comp1 ==1),])
+snp.test.g2 <- unique(snp.test[which(snp.test$cca_genes_comp2 ==1),])
+snp.test.s1 <- unique(snp.test[which(snp.test$cca_species_comp1 ==1),])
+snp.test.s2 <- unique(snp.test[which(snp.test$cca_species_comp2 ==1),])
+
+write.table(snp.test.g1[,c(1:3)], file="/workdir/users/fnn3/twins_uk/scca/snp_location_biomart_gene_comp1.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.test.g2[,c(1:3)], file="/workdir/users/fnn3/twins_uk/scca/snp_location_biomart_gene_comp2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.test.s1[,c(1:3)], file="/workdir/users/fnn3/twins_uk/scca/snp_location_biomart_species_comp1_v2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.test.s2[,c(1:3)], file="/workdir/users/fnn3/twins_uk/scca/snp_location_biomart_species_comp2_v2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+```
+
+```{r}
+#write.table(snp.info, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_biomart.tsv",
+#            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+###Get gene IDs from ensemble IDs
+mart2 <- useMart("ENSEMBL_MART_ENSEMBL", dataset="hsapiens_gene_ensembl")
+listDatasets(mart2)
+dataset2 <- useDataset("hsapiens_gene_ensembl", mart=mart2)
+listAttributes(dataset2)
+listFilters(dataset2)
+gene.id <- snp.info$ensembl_gene_stable_id[which(snp.info$ensembl_gene_stable_id != "")]
+
+
+
+getBM(attributes = c("entrezgene_id", "entrezgene_description", "external_gene_name", "go_id","name_1006","definition_1006", "go_linkage_type", "hgnc_id","hgnc_symbol","kegg_enzyme"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+gene.info <- getBM(attributes = c("entrezgene_id", "entrezgene_description", "ensembl_gene_id", "external_gene_name"), 
+       filters = "ensembl_gene_id", 
+       values = gene.id, 
+       mart = dataset2)
+colnames(gene.info) <- c("entrezgene_id","entrezgene_description","ensembl_gene_stable_id","external_gene_name")
+snp.gene <- merge(snp.info, gene.info, by="ensembl_gene_stable_id", all.x=T)
+snp.gene.test <- merge(snp.gene, snp.all, by.x="refsnp_id", by.y="SNP",all=T)
+write.table(snp.gene.test, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart_gene_species_bothComps.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+##Might be easier to split these up by test now and work on seprate annotations?
+snp.gene.test.g1 <- snp.gene.test[which(snp.gene.test$cca_genes_comp1 >0),]
+snp.gene.test.g2 <- snp.gene.test[which(snp.gene.test$cca_genes_comp2 >0),]
+snp.gene.test.s1 <- snp.gene.test[which(snp.gene.test$cca_species_comp1 >0),]
+snp.gene.test.s2 <- snp.gene.test[which(snp.gene.test$cca_species_comp2 >0),]
+
+write.table(snp.gene.test.g1, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart_gene_comp1.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.gene.test.g2, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart_gene_comp2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.gene.test.s1, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart_species_comp1.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.gene.test.s2, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_wGene_biomart_species_comp2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+
+## What about all SNPs tested? 
+## I already did this...
+## /workdir/users/fnn3/twins_uk/scca/full_snp_annotation_wGene_biomart.tsv
+
+snp.loc.g1 <- snp.gene.test.g1[,c(1,3,4)]
+snp.loc.g2 <- snp.gene.test.g2[,c(1,3,4)]
+snp.loc.s1 <- snp.gene.test.s1[,c(1,3,4)]
+snp.loc.s2 <- snp.gene.test.s2[,c(1,3,4)]
+
+snp.loc.g1$pval <- 1e-8
+snp.loc.g2$pval <- 1e-8
+snp.loc.s1$pval <- 1e-8
+snp.loc.s2$pval <- 1e-8
+
+snp.loc.g1 <- unique(snp.loc.g1)
+snp.loc.g2 <- unique(snp.loc.g2)
+snp.loc.s1 <- unique(snp.loc.s1)
+snp.loc.s2 <- unique(snp.loc.s2)
+
+
+
+write.table(snp.loc.g1, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_gene_comp1.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.loc.g2, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_gene_comp2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.loc.s1, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_species_comp1.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.loc.s2, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_species_comp2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+```
+
+
+```{r}
+## I downloaded the GWAS catalog data. I'm going to see if this is easier to parse and merge to get GWAS trait data for all my genes/snps.
+gwas <- read.delim("/workdir/users/fnn3/references/gwas_catalog_v1.0.2-associations_e100_r2021-04-20_modified.txt", quote="")
+#Some of the genes are comma separated, need to split them
+gwas$MAPPED_GENE <- gsub(" - ", ", ", gwas$MAPPED_GENE )
+#Now combine the two gene columns
+gwas$catalog_gene <- paste(gwas$REPORTED.GENE.S.,",", gwas$MAPPED_GENE)
+gwas2 <- separate_rows(gwas, catalog_gene, sep=", ")
+gwas2[gwas2==""] <-NA
+#gwas3 <- separate_rows(gwas2, MAPPED_GENE, sep=" - ")
+#gwas4 <- separate_rows(gwas3, REPORTED.GENE.S., sep=", ")
+
+#Every gene is listed multiple times if there are multiple hits.I have to pull out only the genes that are in my snp list, then aggregate the traits together.
+snp.gene.list <- snp.gene.test[,c(1,17,18,19,20,21)]
+snp.gene.list[snp.gene.list==""]<-NA
+
+my.gwas <- merge(snp.gene.list, gwas2, by.x="external_gene_name", by.y="catalog_gene", all.x=T)
+my.gwas2 <- my.gwas[,c(1:6,8,18)]
+
+#aggregate the traits by gene and cca test
+my.gwas3 <- my.gwas2 %>%
+  group_by(external_gene_name, refsnp_id) %>%
+  summarize(DISEASE.TRAIT = toString(DISEASE.TRAIT)) %>%
+  ungroup
+
+length(unique(my.gwas3$external_gene_name))
+#244 unique genes in this... 
+
+#Save this!
+write.table(my.gwas3, "/workdir/users/fnn3/twins_uk/scca/all_cca_selected_snps_gwas_annotated.txt", sep="\t",quote=F, row.names=F)
+
+
+length(unique(snp.gene.test.g1$external_gene_name)) #74
+length(unique(snp.gene.test.g2$external_gene_name)) #82
+length(unique(snp.gene.test.s1$external_gene_name)) #75
+length(unique(snp.gene.test.s2$external_gene_name)) #75
+
+```
+
+
+
+
+
+
+```{r}
+
+  
+###Parse the GWAS hit information for all genes
+gwas <- read.delim("/workdir/users/fnn3/twins_uk/scca/all_cca_selected_snps_gwas_annotated.txt", quote="")
+
+##Add columns for which test the gene was found in
+g1 <- as.data.frame(snp.gene.test.g1[,17])
+  g1$g1 <- c("g1")
+  names(g1) <- c("external_gene_name","g1")
+g2 <- as.data.frame(snp.gene.test.g2[,17])
+  g2$g2 <- c("g2")
+   names(g2) <- c("external_gene_name","g2")
+s1 <- as.data.frame(snp.gene.test.s1[,17])
+  s1$s1 <- c("s1")
+   names(s1) <- c("external_gene_name","s1")
+s2 <- as.data.frame(snp.gene.test.s2[,17])
+  s2$s2 <- c("s2")  
+   names(s2) <- c("external_gene_name","s2")
+
+gwas$g1 <- 0
+gwas$g1[gwas$external_gene_name %in% g1$external_gene_name] <- 1
+gwas$g2 <- 0
+gwas$g2[gwas$external_gene_name %in% g2$external_gene_name] <- 1
+gwas$s1 <- 0
+gwas$s1[gwas$external_gene_name %in% s1$external_gene_name] <- 1
+gwas$s2 <- 0
+gwas$s2[gwas$external_gene_name %in% s2$external_gene_name] <- 1
+
+
+gwas$BMI <-   grepl("Body mass index", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Acute.myeloid.leukemia <- grepl("leukemia", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Breast.cancer <- grepl("Breast cancer", gwas$DISEASE.TRAIT, fixed=T, ignore.case = T)
+gwas$Prostate.cancer <- grepl("Prostate cancer", gwas$DISEASE.TRAIT, fixed=T, ignore.case = T)
+gwas$Heel.bone.mineral.density <- grepl("Heel bone mineral density", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Colorectal.cancer <- grepl("Colorectal", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Body.size <- grepl("body size", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Weight <- grepl("weight", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Height <- grepl("height", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Alcohol <- grepl("alcohol", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Crohns <- grepl("Crohn's", gwas$DISEASE.TRAIT, fixed=T, ignore.case = T)
+gwas$Alzheimers <- grepl("Alzheimer", gwas$DISEASE.TRAIT,  ignore.case = T) |
+ grepl("tau", gwas$DISEASE.TRAIT,  ignore.case = T) |
+ grepl("tangles", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Parkinsons <- grepl("Parkinson's", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$BP <- grepl("blood pressure", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Schizophrenia <- grepl("schizophrenia", gwas$DISEASE.TRAIT, ignore.case = T)
+gwas$Type2.diabetes <- grepl("Type 2 diabetes", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$COPD <- grepl("Chronic obstructive pulmonary ", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Triglycerides <- grepl("triglyceride", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Cholesterol <- grepl("cholesterol", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Smoking <- grepl("smoking", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Metabolite.levels <- grepl("Metabolite levels", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Blood.cell.counts <- grepl("blood cell count", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Type1.diabetes <- grepl("Type 1 diabetes", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Obesity <- grepl("obesity", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Asthma <- grepl("asthma", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Allergy <- grepl("allerg", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Multiple.sclerosis <- grepl("sclerosis", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Gout <- grepl("gout", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Lupus <- grepl("lupus", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Eczema <- grepl("eczema", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Apolipoproteins <- grepl("apolipoprotein", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Depression <- grepl("depressi", gwas$DISEASE.TRAIT, ignore.case = T)
+gwas$Dental.caries <- grepl("Dental caries", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Ovarian.cancer <- grepl("varian cancer", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Chronic.kidney.disease <- grepl("kidney", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Coronary.artery.disease <- grepl("coronary artery disease", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Endometrial.cancer <- grepl("Endometrial cancer", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Ovarian.cancer <- grepl("ovarian cancer", gwas$DISEASE.TRAIT,  ignore.case = T) 
+gwas$Lung.cancer <- grepl("Lung cancer", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Venous.thromboembolism <- grepl("venous", gwas$DISEASE.TRAIT, ignore.case = T)
+gwas$Rheumatoid.arthritis <- grepl("rheumatoid arthritis", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Drug.or.treatment.response <- grepl("response",gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Epilepsy <- grepl("epilepsy", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Testosterone <- grepl("testosterone", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Menarche <- grepl("menarche", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Glaucoma <- grepl("Glaucoma", gwas$DISEASE.TRAIT, ignore.case = T)
+gwas$Metabolic.syndrome <- grepl("metabolic syndrome", gwas$DISEASE.TRAIT,  ignore.case = T)
+gwas$Microbiome <- grepl("microbio", gwas$DISEASE.TRAIT, ignore.case = T)
+
+
+
+#test specific files
+gwas.g1 <- gwas[which(gwas$g1 == 1),]
+gwas.g2 <- gwas[which(gwas$g2 == 1),]
+gwas.s1 <- gwas[which(gwas$s1 == 1),]
+gwas.s2 <- gwas[which(gwas$s2 == 1),]
+```
+
+
+```{r}
+#individual plots
+################GENES COMP1
+gwas.g1.2 <- gwas.g1[-c(2:7)]
+gwas.g1.3 <- gwas.g1.2 %>% mutate_if(is.logical, as.numeric)
+gwas.g1.m <- melt(gwas.g1.3)
+
+
+##BAR PLOT
+#Make a bar plot of the GWAS traits
+forplot <- as.data.frame(table(gwas.g1.m$variable, gwas.g1.m$value))
+forplot2 <- forplot[c(48:94),]
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/gwas_traits_barplot_genes_comp1.svg", height=10, width=10)
+ggplot(forplot2, aes(reorder(Var1, -Freq), Freq )) +
+  geom_bar(stat="identity") +
+  xlab("GWAS Trait") + ylab("Number of genes associated with each GWAS trait") +
+  ggtitle("Human SNPs associated with microbial genes\nComponent1") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.title.y = element_text(size=14),
+        axis.text.y = element_text(size=12))
+dev.off()
+
+
+############################GENES COMP2
+gwas.g2.2 <- gwas.g2[-c(2:7)]
+gwas.g2.3 <- gwas.g2.2 %>% mutate_if(is.logical, as.numeric)
+gwas.g2.m <- melt(gwas.g2.3)
+
+
+##BAR PLOT
+#Make a bar plot of the GWAS traits
+forplot <- as.data.frame(table(gwas.g2.m$variable, gwas.g2.m$value))
+forplot2 <- forplot[c(48:94),]
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/gwas_traits_barplot_genes_comp2.svg", height=10, width=10)
+ggplot(forplot2, aes(reorder(Var1, -Freq), Freq )) +
+  geom_bar(stat="identity") +
+  xlab("GWAS Trait") + ylab("Number of genes associated with each GWAS trait") +
+  ggtitle("Human SNPs associated with microbial genes\nComponent2") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.title.y = element_text(size=14),
+        axis.text.y = element_text(size=12))
+dev.off()
+
+################SPECIES COMP1
+gwas.s1.2 <- gwas.s1[-c(2:7)]
+gwas.s1.3 <- gwas.s1.2 %>% mutate_if(is.logical, as.numeric)
+gwas.s1.m <- melt(gwas.s1.3)
+
+
+##BAR PLOT
+#Make a bar plot of the GWAS traits
+forplot <- as.data.frame(table(gwas.s1.m$variable, gwas.s1.m$value))
+forplot2 <- forplot[c(48:94),]
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/gwas_traits_barplot_species_comp1.svg", height=10, width=10)
+ggplot(forplot2, aes(reorder(Var1, -Freq), Freq )) +
+  geom_bar(stat="identity") +
+  xlab("GWAS Trait") + ylab("Number of genes associated with each GWAS trait") +
+  ggtitle("Human SNPs associated with microbial species\nComponent1") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.title.y = element_text(size=14),
+        axis.text.y = element_text(size=12))
+dev.off()
+
+
+############################GENES COMP2
+gwas.s2.2 <- gwas.s2[-c(2:7)]
+gwas.s2.3 <- gwas.s2.2 %>% mutate_if(is.logical, as.numeric)
+gwas.s2.m <- melt(gwas.s2.3)
+
+
+##BAR PLOT
+#Make a bar plot of the GWAS traits
+forplot <- as.data.frame(table(gwas.s2.m$variable, gwas.s2.m$value))
+forplot2 <- forplot[c(48:94),]
+
+svg("/workdir/users/fnn3/twins_uk/scca/plots/gwas_traits_barplot_species_comp2.svg", height=10, width=10)
+ggplot(forplot2, aes(reorder(Var1, -Freq), Freq )) +
+  geom_bar(stat="identity") +
+  xlab("GWAS Trait") + ylab("Number of genes associated with each GWAS trait") +
+  ggtitle("Human SNPs associated with microbial species\nComponent2") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.title.y = element_text(size=14),
+        axis.text.y = element_text(size=12))
+dev.off()
+
+```
+
+
+```{r}
+# THese are the results from FUMA GWAS
+#Plotting the GWAS catalog traits myself?
+#"#E69F00", "#56B4E9"
+#Gene comp 2 to start
+gwas.g2 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59285_geneComp2/GS.txt", quote="")
+gwas.g2b <- gwas.g2[which(gwas.g2$Category=="GWAScatalog"),]
+gwas.g2c <- gwas.g2b[-c(3,4,13,16,20,21,23,25,28,29,30,34,35,37,40,43,44),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/gene_comp2_gwas_trait_plot.pdf")
+ggplot(gwas.g2c, aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill="#56B4E9", stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank()) +
+  theme(text=element_text(size=12))
+
+dev.off()
+
+
+gwas.g1 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59284_geneComp1/GS.txt", quote="")
+gwas.g1b <- gwas.g1[which(gwas.g1$Category=="GWAScatalog"),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/gene_comp1_gwas_trait_plot.pdf")
+ggplot(gwas.g1b, aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill = "#E69F00", stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+
+
+###Species
+gwas.s1 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59318_speciesComp1/GS.txt", quote="")
+gwas.s1b <- gwas.s1[which(gwas.s1$Category=="GWAScatalog"),]
+
+
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/species_comp1_gwas_trait_plot.pdf")
+ggplot(gwas.s1b, aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill="#E69F00", stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+
+gwas.s2 <- read.delim("/workdir/users/fnn3/twins_uk/scca/fuma/FUMA_gene2func59319_speciesComp2/GS.txt", quote="")
+gwas.s2b <- gwas.s2[which(gwas.s2$Category=="GWAScatalog"),]
+gwas.s2c <- gwas.s2b[-c(3,17,19,22,24),]
+
+pdf("/workdir/users/fnn3/twins_uk/scca/fuma/species_comp2_gwas_trait_plot.pdf")
+ggplot(gwas.s2c, aes(reorder(GeneSet, -adjP), -log10(adjP))) +
+  geom_bar(fill="#56B4E9",stat="identity") +
+  coord_flip() +
+  ylab("-log10 adjusted P-value") +
+  theme_classic() +
+  theme(axis.title.y = element_blank())+
+  theme(text=element_text(size=12))
+dev.off()
+
+```
+###REDOING The Species analysis####
+
+```{r}
+###The SNPs from the species redo runs. 
+snp.s1 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_results_nonzero_rsID_v2.txt", header=T)
+snp.s2 <- read.csv("/workdir/users/fnn3/twins_uk/scca/species/twinsUK_species_alpha_comp2_results_nonzero_rsID_v2.txt", header=T)
+
+#Check for overlap between my analyses, then check with past mGWAS
+#Add column to specify which results each one is adn then combine to look for overlap
+snp.g1$cca_genes_comp1 <- 1
+snp.g2$cca_genes_comp2 <- 1
+snp.s1$cca_species_comp1 <- 1
+snp.s2$cca_species_comp2 <- 1
+
+snp.g1g2 <- merge(snp.g1, snp.g2, by="SNP", all=T)
+snp.g1g2s1 <- merge(snp.g1g2, snp.s1, by="SNP", all=T)
+snp.all <- merge(snp.g1g2s1, snp.s2, by="SNP", all=T)
+
+snp.all$rowsum <- rowSums(snp.all[,-1], na.rm=T)
+check <- snp.all[(snp.all$rowsum == 2),]
+
+table(check$cca_genes_comp1, check$cca_species_comp1) #53
+table(check$cca_genes_comp1, check$cca_species_comp2) #2 
+table(check$cca_genes_comp2, check$cca_species_comp1) #0
+table(check$cca_genes_comp2, check$cca_species_comp2) #12
+table(snp.all$rowsum)
+check2 <- merge(snp.all, ext_gwas, by.x="SNP", by.y="refsnp_id") # 1 Davenport
+check3 <- merge(snp.all, kurilshikov, by.x="SNP", by.y="rsID") #15, actually 11, two are repeated 3 times 
+
+
+
+
+
+snp.loc.s1 <- snp.test.s1[,c(1:3)]
+snp.loc.s2 <- snp.test.s2[,c(1:3)]
+
+snp.loc.s1$pval <- 1e-8
+snp.loc.s2$pval <- 1e-8
+
+snp.loc.s1 <- unique(snp.loc.s1)
+snp.loc.s2 <- unique(snp.loc.s2)
+
+
+write.table(snp.loc.s1, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_species_comp1_v2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+write.table(snp.loc.s2, file="/workdir/users/fnn3/twins_uk/scca/snp_annotation_forFUMA_species_comp2_v2.tsv",
+            sep="\t", col.names=T, row.names=F, append = F, quote=FALSE)
+
+```
+
+
+

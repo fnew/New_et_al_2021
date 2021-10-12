@@ -1,0 +1,38 @@
+#$ -S /bin/bash
+#$ -N flash
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/flash_merge.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/align
+#$ -l h_vmem=100G
+#$ -pe parenv 10
+#$ -q long.q@cbsubrito2
+#$ -t 1
+
+
+#Script to run Pear to merge the fastq reads together
+#Going to try Flash?
+
+WRK=/workdir/users/fnn3
+
+LIST=$WRK/design_files/twins_names.txt
+DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+	NAME=`basename "$DESIGN"`
+
+FQ1=/workdir/data/twins/3-derep/${NAME}_1.fastq
+FQ2=/workdir/data/twins/3-derep/${NAME}_2.fastq
+
+OUT=$WRK/twins_uk/genes/align/merged_fq/${NAME}
+  if [ ! -d $OUT ]; then mkdir -p $OUT; fi
+
+#Set up logging
+LOGS=$WRK/twins_uk/genes/align/pear_logs
+  if [ ! -e $LOGS ]; then mkdir -p $LOGS; fi
+MYLOG=$LOGS/${NAME}.log
+printf "BEGIN: `date` $NAME TASK_ID:$SGE_TASK_ID HOSTNAME:$HOSTNAME \n\n" > "${MYLOG}"
+
+#run Pear
+#/programs/pear/pear -f $FQ1 -r $FQ2 -o $OUT/${NAME} -j 10 -y 50G >> "${MYLOG}"
+#
+#Try Flash2?
+
+/programs/FLASH2/flash2 $FQ1 $FQ2 -d $OUT -o ${NAME} -t 10 --max-overlap 250

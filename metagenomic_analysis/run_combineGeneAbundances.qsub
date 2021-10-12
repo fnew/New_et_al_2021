@@ -1,18 +1,22 @@
 #$ -S /bin/bash
-#$ -N combineRPKM
+#$ -N combineCounts
 #$ -V
-#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/twins_combineRpkm.err
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_uk/twins_combine_aRPKM.err
 #$ -wd /workdir/users/fnn3/twins_uk
 #$ -q long.q@cbsubrito2
-#$ -l h_vmem=30G
+#$ -l h_vmem=70G
 
 # Script to combine the counts files into one abundance table with the IGC functional annotations
 
 WRK=/workdir/users/fnn3
-IN=$WRK/twins_uk/gene_abundance/filtered
-OUT=$WRK/twins_uk/gene_abundance/filtered/gene_abundance_table_filt90_primary_cov80.csv
-LOG=$WRK/twins_uk/gene_abundance/combineCounts.log
+#IN=$WRK/twins_uk/bam/filtered_bam/idxstats
+#OUT=$WRK/twins_uk/bam/filtered_bam/idxstats/raw_unagg_counts_table_filt90_primary.csv
+#LOG=$WRK/twins_uk/bam/filtered_bam/idxstats/combineCounts.log
 
-PROG=$WRK/scripts/combineGeneAbundances.py
+IN=$WRK/twins_uk/genes/abundance/filtered
+OUT=$WRK/twins_uk/genes/abundance/BGI_geneAbun_unagg_filt90_cov80_primary.csv
+LOG=$WRK/twins_uk/genes/abundance/combineCounts.log
+
+PROG=$WRK/scripts/general_use/combineGeneAbundances.py
 
 python  $PROG -i $IN  -o $OUT -g $LOG

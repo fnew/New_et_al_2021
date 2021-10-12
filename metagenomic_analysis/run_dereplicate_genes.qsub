@@ -1,0 +1,21 @@
+#$ -S /bin/bash
+#$ -N vsearchDerep
+#$ -V
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_fxn/vsearch_derep_bgi.err
+#$ -wd /workdir/users/fnn3/twins_uk/genes/vsearch
+#$ -l h_vmem=80G
+#$ -pe parenv 1
+#$ -q short.q@cbsubrito2
+
+## DEprelicate the gene file before clustering to help clustering go faster
+
+WRK=/workdir/users/fnn3
+
+FA=$WRK/twins_uk/genes/prodigal/BGI_twins_all_prodigal_genes_nuc.fa
+#FAA=$WRK/twins_uk/genes/prodigal/BGI_twins_all_prodigal_proteins.faa
+#OUT=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_proteins.faa
+OUT=$WRK/twins_uk/genes/vsearch/BGI_twins_derep_prodigal_genes.fa
+
+#Run vsearch
+cd $OUT
+/programs/vsearch-2.15.0/bin/vsearch --derep_fulllength $FAA --output $OUT

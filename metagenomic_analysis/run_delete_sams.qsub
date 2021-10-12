@@ -1,0 +1,25 @@
+#$ -S /bin/bash
+#$ -N deleteSams
+#$ -V
+#$ -t 201-225
+#$ -e /workdir/users/fnn3/scripts/PBS_LOGS/bwa_aln_twins/sam2bam.err
+#$ -wd /workdir/users/fnn3/twins_uk
+
+#After converting SAM to BAM, this script will clean up the SAM files
+
+#Set directories
+WRK=/workdir/users/fnn3
+
+#Define design file
+DESIGN_FILE=$WRK/design_files/twins_names.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	BATCH=${ARRAY[0]}
+	SAMPLE=${ARRAY[1]}
+	
+	NAME=${SAMPLE}
+
+
+cd $WRK/twins_uk/alignments
+rm ${NAME}.sam

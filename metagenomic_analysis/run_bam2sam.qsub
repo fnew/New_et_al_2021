@@ -1,0 +1,29 @@
+#$ -S /bin/bash
+#$ -N bam2sam
+#$ -V
+#$ -t 1
+#$ -e /workdir/users/fnn3/scripts/LOGS/twins_aln/bam2sam.err
+#$ -wd /workdir/users/fnn3/twins_uk
+#$ -l h_vmem=15G
+#$ -q long.q@cbsubrito2
+
+
+#This script will convert my BAMs to SAM
+
+#Set directories
+WRK=/workdir/users/fnn3
+
+#Design file
+DESIGN_FILE=$WRK/design_files/twins_names.txt
+   DESIGN=$(sed -n "${SGE_TASK_ID}p" $LIST)
+   NAME=`basename "$DESIGN"`
+
+
+BAM=$WRK/twins_uk/bam/${NAME}.bam
+SAM=$WRK/twins_uk/alignments/${NAME}.sam
+
+
+export PATH=/programs/samtools-0.1.19
+
+samtools view -h -o $SAM $BAM
+

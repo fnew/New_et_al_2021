@@ -1,0 +1,32 @@
+#$ -S /bin/bash
+#$ -N bam2bed
+#$ -V
+##$ -M fnn3@cornell.edu
+#$ -e /workdir/users/fnn3/scripts/PBS_LOGS/bam2bed/bam2bed.err
+#$ -wd /workdir/users/fnn3/twins_uk/bam/logs
+#$ -l h_vmem=16G
+#$ -pe parenv 4
+#$ -t 1
+
+## This script will convert the aligned bam files to bed
+
+#Set directories
+WRK=/workdir/users/fnn3
+OUT=$WRK/twins_uk/bam/bed
+	if [! -e $OUT]; then mkdir -p $OUT; fi
+BAM=$WRK/twins_uk/bam
+
+#Design file
+DESIGN_FILE=$WRK/design_files/twins_names.csv
+	DESIGN=$(sed -n "${SGE_TASK_ID}p" $DESIGN_FILE)
+	IFS=',' read -ra ARRAY <<< "$DESIGN"
+
+	BATCH=${ARRAY[0]}
+	SAMPLE=${ARRAY[1]}
+
+	NAME=${SAMPLE}
+
+BAM2BED=/programs/BEDTools-Version-2.16.2/bin/bamToBed
+
+#Call bedtools
+$BAM2BED -i $BAM/${NAME}.sorted.bam > $OUT/${NAME}.bed
